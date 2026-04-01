@@ -2,6 +2,7 @@ import { paperZoteroPageUrl } from '@/lib/client-api';
 import type { PaperResult } from '@/lib/types';
 import { motion } from 'framer-motion';
 import { ArrowRight, BookMarked, ImageIcon, Landmark, Users } from 'lucide-react';
+import type { CSSProperties } from 'react';
 
 type PaperResultCardProps = {
   paper: PaperResult;
@@ -133,9 +134,17 @@ export function PaperResultCard({ paper, onOpenPaper, onQuickPeek }: PaperResult
   );
 }
 
-export function PaperResultCardSkeleton() {
+export function PaperResultCardSkeleton({ index = 0 }: { index?: number }) {
   return (
-    <article className='skeleton-card-sheen relative flex h-full min-h-[37rem] flex-col overflow-hidden rounded-[2rem] border border-white/85 bg-white/92 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'>
+    <article
+      className='search-skeleton-card skeleton-card-sheen relative flex h-full min-h-[37rem] flex-col overflow-hidden rounded-[2rem] border border-white/85 bg-white/92 shadow-[0_18px_40px_rgba(15,23,42,0.06)]'
+      style={
+        {
+          '--skeleton-delay': `${index * 180}ms`,
+          '--skeleton-delay-short': `${index * 70}ms`,
+        } as CSSProperties
+      }
+    >
       <div className='relative h-56 overflow-hidden border-b border-slate-100/90 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)]'>
         <div className='absolute inset-x-5 top-5 flex items-center justify-between'>
           <div className='skeleton-pulse h-7 w-28 rounded-full' />

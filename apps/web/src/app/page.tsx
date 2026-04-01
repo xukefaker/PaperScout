@@ -265,10 +265,6 @@ function formatProgressDetail(stage: string | undefined, progress: SearchJobProg
       return `${completed} / ${total} candidate papers verified by the final model`;
     }
   }
-
-  if (progress.stage_index > 0 && progress.stage_total > 0) {
-    return `Stage ${progress.stage_index} of ${progress.stage_total}`;
-  }
   return null;
 }
 
@@ -280,23 +276,29 @@ function SearchProgressPanel({ message }: { message: SearchMessage }) {
   const activeStageIndex = progress?.stage_index ?? 0;
 
   return (
-    <div className="mt-6 w-full max-w-[560px] rounded-[1.6rem] border border-indigo-100/90 bg-white/96 p-5 shadow-scholar-sm">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-slate-400">Live pipeline progress</div>
-          <div className="mt-2 text-[0.96rem] font-semibold tracking-tight text-slate-900">
-            {stageMeta?.label ?? message.stageMessage ?? 'Preparing the search pipeline'}
+    <div className="search-progress-panel mt-2 w-full max-w-[620px] overflow-hidden rounded-[1.7rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,249,252,0.96))] p-5 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
+      <div className="search-progress-panel__rail" />
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex items-center gap-3">
+          <ActivityMark mode="active" label={null} layout="inline" size="md" />
+          <div className="min-w-0">
+            <div className="truncate text-[1rem] font-semibold tracking-tight text-slate-950">
+              {stageMeta?.label ?? 'Preparing the search pipeline'}
+            </div>
+            <div className="mt-1 text-[0.8rem] leading-6 text-slate-500">
+              {message.stageMessage ?? 'Searching across the current corpus.'}
+            </div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-[1.35rem] font-black tracking-tight text-slate-950">{overallProgressPercent}%</div>
-          <div className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-400">Overall</div>
+        <div className="shrink-0 text-right">
+          <div className="text-[1.28rem] font-black tracking-tight text-slate-950">{overallProgressPercent}%</div>
+          <div className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-slate-400">Progress</div>
         </div>
       </div>
 
-      <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
         <div
-          className="h-full rounded-full bg-[linear-gradient(90deg,#4f46e5_0%,#6366f1_55%,#60a5fa_100%)] transition-[width] duration-500"
+          className="search-progress-fill h-full rounded-full bg-[linear-gradient(90deg,#4f46e5_0%,#6366f1_55%,#60a5fa_100%)] transition-[width] duration-500"
           style={{ width: `${overallProgressPercent}%` }}
         />
       </div>
@@ -309,11 +311,11 @@ function SearchProgressPanel({ message }: { message: SearchMessage }) {
           return (
             <div
               key={stage.id}
-              className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[0.68rem] font-bold uppercase tracking-[0.16em] transition-colors ${
+              className={`search-stage-chip inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[0.66rem] font-bold uppercase tracking-[0.16em] transition-colors ${
                 isCompleted
                   ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
                   : isActive
-                    ? 'border-slate-300 bg-slate-950 text-white'
+                    ? 'search-stage-chip--active border-slate-300 bg-slate-950 text-white'
                     : 'border-slate-200 bg-slate-50 text-slate-400'
               }`}
             >
@@ -328,12 +330,7 @@ function SearchProgressPanel({ message }: { message: SearchMessage }) {
         })}
       </div>
 
-      <div className="mt-4 flex items-center gap-2 text-[0.74rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        {message.stageMessage || 'Searching'}
-      </div>
-
-      {detail ? <div className="mt-2 text-[0.82rem] leading-6 text-slate-500">{detail}</div> : null}
+      {detail ? <div className="mt-3 text-[0.8rem] leading-6 text-slate-500">{detail}</div> : null}
     </div>
   );
 }
@@ -385,8 +382,47 @@ function SearchSuggestionPanel({
 function SearchResultsSkeletonGrid() {
   return (
     <div className='grid grid-cols-1 gap-6 lg:grid-cols-2 2xl:grid-cols-3'>
-      {Array.from({ length: 6 }, (_, index) => (
-        <PaperResultCardSkeleton key={`skeleton-${index}`} />
+      {Array.from({ length: 3 }, (_, index) => (
+        <PaperResultCardSkeleton key={`skeleton-${index}`} index={index} />
+      ))}
+    </div>
+  );
+}
+
+function getSearchResultHeadline(message: SearchMessage): string {
+  if ((message.content ?? '').toLowerCase().startsWith('restored search')) {
+    return 'Workspace restored';
+  }
+  return 'Search complete';
+}
+
+function SearchResultRevealGrid({
+  papers,
+  traceId,
+  onOpenPaper,
+  onQuickPeek,
+}: {
+  papers: PaperResult[];
+  traceId: string | null;
+  onOpenPaper: (paper: PaperResult, traceId?: string | null) => void;
+  onQuickPeek: (paper: PaperResult, traceId?: string | null) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 2xl:grid-cols-3">
+      {papers.map((paper, index) => (
+        <motion.div
+          key={paper.paper_id}
+          initial={{ opacity: 0, y: 18, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.32, ease: 'easeOut', delay: Math.min(index, 5) * 0.07 }}
+          className="search-result-reveal"
+        >
+          <PaperResultCard
+            paper={paper}
+            onOpenPaper={(nextPaper) => onOpenPaper(nextPaper, traceId)}
+            onQuickPeek={(nextPaper) => onQuickPeek(nextPaper, traceId)}
+          />
+        </motion.div>
       ))}
     </div>
   );
@@ -708,15 +744,6 @@ export default function ChatPage() {
     }
     previousMessageCountRef.current = messages.length;
   }, [hasSearchHistory, messages.length, scrollToBottom, selectedPaper]);
-
-  const activeLoadingMessage = useMemo(() => {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      if (messages[index]?.status === 'loading') {
-        return messages[index];
-      }
-    }
-    return null;
-  }, [messages]);
 
   const openSearchPalette = useCallback((prefill?: string) => {
     const nextValue = prefill ?? input.trim() ?? '';
@@ -1555,7 +1582,7 @@ export default function ChatPage() {
 
       <header className="glass-header fixed inset-x-0 top-0 z-50">
         <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between px-5 py-4 sm:px-8">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4">
             <ActivityMark
               mode={headerActivityMode}
               label={headerActivityMode === 'active' ? 'Searching' : headerActivityMode === 'done' ? 'Ready' : null}
@@ -1595,6 +1622,15 @@ export default function ChatPage() {
             </button>
           </div>
         </div>
+        <div
+          className={`header-status-rail ${
+            headerActivityMode === 'active'
+              ? 'header-status-rail--active'
+              : headerActivityMode === 'done'
+                ? 'header-status-rail--done'
+                : ''
+          }`}
+        />
       </header>
 
       <AnimatePresence mode="wait">
@@ -1652,68 +1688,97 @@ export default function ChatPage() {
             <main ref={searchScrollRef} className="custom-scrollbar flex-1 overflow-y-auto">
               <div className="mx-auto w-full max-w-[1440px] px-5 pb-12 pt-10 sm:px-8">
                 <div className="mx-auto max-w-[1220px] space-y-8">
-                  {messages.map((message) => (
-                    <section
-                      key={message.id}
-                      className="flex justify-center"
-                    >
-                      <div className="w-full max-w-[1180px]">
-                        <div className="min-w-0 flex-1 space-y-5">
-                          <div
-                            className={`rounded-[2rem] border px-6 py-5 ${
-                              message.role === 'user'
-                                ? 'ml-auto w-fit max-w-[min(100%,52rem)] border-slate-200/80 bg-white/86 text-slate-900 shadow-scholar-lg backdrop-blur-xl'
-                                : message.type === 'search_results'
-                                  ? 'border-transparent bg-transparent px-0 py-0 shadow-none'
+                  {messages.map((message) => {
+                    const isLoadingAssistant = message.role === 'assistant' && message.status === 'loading';
+                    const isSearchResultMessage = message.type === 'search_results' && !!message.results;
+
+                    if (isLoadingAssistant) {
+                      return (
+                        <section key={message.id} className="flex justify-center">
+                          <div className="w-full max-w-[1180px]">
+                            <div className="mx-auto max-w-[980px] space-y-6">
+                              <SearchProgressPanel message={message} />
+                              <SearchResultsSkeletonGrid />
+                            </div>
+                          </div>
+                        </section>
+                      );
+                    }
+
+                    if (isSearchResultMessage) {
+                      return (
+                        <section key={message.id} className="flex justify-center">
+                          <div className="w-full max-w-[1180px]">
+                            <div className="space-y-5">
+                              <div className="overflow-hidden rounded-[1.9rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,249,252,0.96))] px-6 py-5 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="min-w-0 flex items-center gap-3">
+                                    <ActivityMark mode="done" label={null} layout="inline" size="md" />
+                                    <div className="min-w-0">
+                                      <div className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-indigo-500">
+                                        {getSearchResultHeadline(message)}
+                                      </div>
+                                      <div className="mt-1 text-[1.08rem] font-semibold tracking-tight text-slate-950">
+                                        {message.content}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.66rem] font-bold uppercase tracking-[0.18em] text-slate-500 sm:inline-flex">
+                                    Ready for review
+                                  </div>
+                                </div>
+                              </div>
+
+                              <SearchTracePanel
+                                message={message}
+                                onToggle={() => void handleToggleTrace(message.id)}
+                              />
+
+                              <SearchResultRevealGrid
+                                papers={message.results ?? []}
+                                traceId={message.traceId ?? null}
+                                onOpenPaper={handleOpenPaper}
+                                onQuickPeek={handleQuickPeek}
+                              />
+                            </div>
+                          </div>
+                        </section>
+                      );
+                    }
+
+                    return (
+                      <section
+                        key={message.id}
+                        className="flex justify-center"
+                      >
+                        <div className="w-full max-w-[1180px]">
+                          <div className="min-w-0 flex-1 space-y-5">
+                            <div
+                              className={`rounded-[2rem] border px-6 py-5 ${
+                                message.role === 'user'
+                                  ? 'ml-auto w-fit max-w-[min(100%,52rem)] border-slate-200/80 bg-white/86 text-slate-900 shadow-scholar-lg backdrop-blur-xl'
                                   : 'mr-auto w-fit max-w-[min(100%,54rem)] border-slate-200/90 bg-white/90 text-slate-700 shadow-scholar-lg backdrop-blur-xl'
-                            }`}
-                          >
-                            {message.type !== 'search_results' ? (
+                              }`}
+                            >
                               <div className="mb-3 text-[0.68rem] font-bold uppercase tracking-[0.24em] text-slate-400">
                                 {message.role === 'user' ? 'Query' : 'Search system'}
                               </div>
-                            ) : null}
 
-                            <div
-                              className={`${
-                                message.type === 'search_results'
-                                  ? 'text-[1.75rem] font-black tracking-tight text-slate-950'
-                                  : message.role === 'user'
+                              <div
+                                className={`${
+                                  message.role === 'user'
                                     ? 'font-scholar text-[1.18rem] italic leading-9 text-slate-700'
                                     : 'text-[1rem] leading-8'
-                              }`}
-                            >
-                              {message.content}
+                                }`}
+                              >
+                                {message.content}
+                              </div>
                             </div>
-
-                            {message.status === 'loading' ? <SearchProgressPanel message={message} /> : null}
                           </div>
-
-                          {message.status === 'loading' ? <SearchResultsSkeletonGrid /> : null}
-
-                          {message.type === 'search_results' ? (
-                            <SearchTracePanel
-                              message={message}
-                              onToggle={() => void handleToggleTrace(message.id)}
-                            />
-                          ) : null}
-
-                          {message.type === 'search_results' && message.results ? (
-                            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 2xl:grid-cols-3">
-                              {message.results.map((paper) => (
-                                <PaperResultCard
-                                  key={paper.paper_id}
-                                  paper={paper}
-                                  onOpenPaper={(nextPaper) => handleOpenPaper(nextPaper, message.traceId ?? null)}
-                                  onQuickPeek={(nextPaper) => handleQuickPeek(nextPaper, message.traceId ?? null)}
-                                />
-                              ))}
-                            </div>
-                          ) : null}
                         </div>
-                      </div>
-                    </section>
-                  ))}
+                      </section>
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
               </div>
@@ -1721,15 +1786,7 @@ export default function ChatPage() {
 
             <footer className="glass-header sticky bottom-0 z-30 border-t border-white/70">
               <div className="mx-auto w-full max-w-[1440px] px-5 py-4 sm:px-8">
-                <div className="mx-auto max-w-[1080px] space-y-3">
-                  {activeLoadingMessage?.stageMessage ? (
-                    <div className="text-center text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      {activeLoadingMessage.stageMessage}
-                      {activeLoadingMessage.progress ? ` • ${clampPercentage(Math.round(activeLoadingMessage.progress.overall_progress * 100))}%` : ''}
-                    </div>
-                  ) : null}
-                  {renderQueryForm('dock')}
-                </div>
+                <div className="mx-auto max-w-[1080px]">{renderQueryForm('dock')}</div>
               </div>
             </footer>
           </motion.div>
