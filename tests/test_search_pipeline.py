@@ -10,10 +10,11 @@ import numpy as np
 import pytest
 from typer.testing import CliRunner
 
+import paperscout.cli as cli_module
 from paperscout.acl_anthology import ACLAnthologyIngestor, _ListingEntry
 from paperscout.api import app
 from paperscout.cli import app as cli_app
-from paperscout.config import Settings
+from paperscout.config import CorpusSpec, Settings
 from paperscout.indexer import IndexBuilder
 from paperscout.pdf_parser import PDFParser
 from paperscout.planner import QueryPlanner
@@ -460,6 +461,72 @@ def test_index_builder_honors_max_papers(tmp_path: Path, monkeypatch) -> None:
     state = store.load_index_state()
     assert state["total_papers"] == 2
     assert state["indexed_papers"] == 2
+
+
+def test_index_command_uses_active_corpus_for_demo_papers(tmp_path: Path, monkeypatch) -> None:
+    from paperscout.models import PaperRecord
+
+    monkeypatch.setattr(cli_module, "PROJECT_ROOT", str(tmp_path))
+    settings = Settings.from_env(tmp_path, corpus=CorpusSpec.from_values("acl", 2025, "long"))
+    settings.ensure_dirs()
+    settings.active_corpus_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.active_corpus_path.write_text(
+        json.dumps(settings.corpus.to_dict(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    pdf_path = settings.pdf_dir / "acl" / "2025" / "long" / "demo.pdf"
+    pdf_path.parent.mkdir(parents=True, exist_ok=True)
+    pdf_path.write_bytes(b"%PDF-1.4\n")
+    LocalStore(settings).save_raw_papers(
+        [
+            PaperRecord(
+                paper_id="2025.acl-long.demo",
+                title="Demo ACL Paper",
+                venue="acl",
+                year=2025,
+                track="long",
+                url=pdf_path.as_uri(),
+                pdf_url=pdf_path.as_uri(),
+                local_pdf_path=str(pdf_path),
+            )
+        ]
+    )
+
+    seen: dict[str, tuple[str, int, str]] = {}
+
+    class _Summary:
+        indexed_papers = 1
+
+        def model_dump(self) -> dict[str, int]:
+            return {"indexed_papers": self.indexed_papers}
+
+    class _FakeIndexBuilder:
+        def __init__(self, builder_settings: Settings, store: LocalStore) -> None:
+            seen["corpus"] = (
+                builder_settings.corpus.venue,
+                builder_settings.corpus.year,
+                builder_settings.corpus.track,
+            )
+
+        def load_paper_ids(self, paper_id_file: Path) -> list[str]:
+            return []
+
+        def build(self, max_papers: int | None = None, paper_ids: list[str] | None = None) -> _Summary:
+            assert max_papers == 1
+            assert paper_ids is None
+            return _Summary()
+
+    monkeypatch.setattr(cli_module, "IndexBuilder", _FakeIndexBuilder)
+    monkeypatch.setattr(
+        cli_module,
+        "rebuild_search_current",
+        lambda root, corpora=None: {"corpora": [item.to_dict() for item in (corpora or [])]},
+    )
+
+    result = CliRunner().invoke(cli_app, ["index", "--skip-parse", "--max-papers", "1"])
+
+    assert result.exit_code == 0, result.stdout
+    assert seen["corpus"] == ("acl", 2025, "long")
 
 
 def test_index_builder_honors_explicit_paper_id_order(tmp_path: Path, monkeypatch) -> None:

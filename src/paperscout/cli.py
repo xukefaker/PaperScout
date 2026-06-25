@@ -235,7 +235,7 @@ def add_pdfs(
 
 
 @app.command("index")
-def index_personal_library(
+def index_library(
     year: int | None = typer.Option(None, "--year", help="Personal library year. Defaults to the current year."),
     max_papers: int | None = typer.Option(None, "--max-papers", min=1),
     paper_id_file: Path | None = typer.Option(
@@ -249,11 +249,19 @@ def index_personal_library(
     ),
     run_parse: bool = typer.Option(True, "--parse/--skip-parse", help="Run MinerU before building indexes."),
 ) -> None:
-    settings = Settings.from_env(root_dir=_project_root(), corpus=_personal_corpus(year))
+    settings = (
+        Settings.from_env(root_dir=_project_root(), corpus=_personal_corpus(year))
+        if year is not None
+        else Settings.from_env(root_dir=_project_root())
+    )
     store = LocalStore(settings)
     source_papers = store.load_source_papers()
     if not source_papers:
-        raise RuntimeError("No PDFs are registered. Run `paperscout add-pdfs ./your-pdfs` first.")
+        corpus_key = f"{settings.corpus.venue}/{settings.corpus.year}/{settings.corpus.track}"
+        raise RuntimeError(
+            f"No PDFs are registered for {corpus_key}. Run `paperscout add-pdfs ./your-pdfs` "
+            "or `paperscout demo-acl` first."
+        )
 
     if run_parse:
         from .mineru_pipeline import run_mineru_pipeline
