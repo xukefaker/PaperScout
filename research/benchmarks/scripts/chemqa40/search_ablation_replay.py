@@ -14,22 +14,22 @@ from typing import Any
 
 import numpy as np
 
-PROJECT_ROOT = Path("/workspace/PaperSearchAgent")
+PROJECT_ROOT = Path("/workspace/PaperScout")
 if str(PROJECT_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-CACHE_ROOT = Path(os.environ.get("PAPER_SEARCH_AGENT_CACHE_ROOT", "/workspace/caches"))
+CACHE_ROOT = Path(os.environ.get("PAPERSCOUT_CACHE_ROOT", "/workspace/caches"))
 os.environ.setdefault("XDG_CACHE_HOME", str(CACHE_ROOT))
 os.environ.setdefault("HF_HOME", str(CACHE_ROOT / "huggingface"))
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(Path(os.environ["HF_HOME"]) / "hub"))
 os.environ.setdefault("TRANSFORMERS_CACHE", str(Path(os.environ["HF_HOME"]) / "transformers"))
 os.environ.setdefault("TORCH_HOME", str(CACHE_ROOT / "torch"))
-os.environ.setdefault("PAPER_SEARCH_AGENT_DENSE_DEVICE", "cpu")
-os.environ.setdefault("PAPER_SEARCH_AGENT_RERANKER_DEVICE", "cuda:0")
+os.environ.setdefault("PAPERSCOUT_DENSE_DEVICE", "cpu")
+os.environ.setdefault("PAPERSCOUT_RERANKER_DEVICE", "cuda:0")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-from paper_search_agent.config import Settings
-from paper_search_agent.models import (  # noqa: E402
+from paperscout.config import Settings
+from paperscout.models import (  # noqa: E402
     EvidenceChunk,
     PaperResult,
     QueryPlan,
@@ -39,14 +39,14 @@ from paper_search_agent.models import (  # noqa: E402
     TokenUsage,
     VerifierRubric,
 )
-from paper_search_agent.planner import PlannerResult  # noqa: E402
-from paper_search_agent.search import (  # noqa: E402
+from paperscout.planner import PlannerResult  # noqa: E402
+from paperscout.search import (  # noqa: E402
     SearchEngine,
     _aggregate_top_local_scores,
     _normalize_scores,
 )
-from paper_search_agent.storage import LocalStore  # noqa: E402
-from paper_search_agent.utils import cosine_similarity_matrix, truncate_text  # noqa: E402
+from paperscout.storage import LocalStore  # noqa: E402
+from paperscout.utils import cosine_similarity_matrix, truncate_text  # noqa: E402
 
 
 @dataclass(slots=True)

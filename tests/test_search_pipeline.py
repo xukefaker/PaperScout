@@ -10,15 +10,15 @@ import numpy as np
 import pytest
 from typer.testing import CliRunner
 
-from paper_search_agent.acl_anthology import ACLAnthologyIngestor, _ListingEntry
-from paper_search_agent.api import app
-from paper_search_agent.cli import app as cli_app
-from paper_search_agent.config import Settings
-from paper_search_agent.indexer import IndexBuilder
-from paper_search_agent.pdf_parser import PDFParser
-from paper_search_agent.planner import QueryPlanner
-from paper_search_agent.search_current import rebuild_search_current
-from paper_search_agent.storage import LocalStore
+from paperscout.acl_anthology import ACLAnthologyIngestor, _ListingEntry
+from paperscout.api import app
+from paperscout.cli import app as cli_app
+from paperscout.config import Settings
+from paperscout.indexer import IndexBuilder
+from paperscout.pdf_parser import PDFParser
+from paperscout.planner import QueryPlanner
+from paperscout.search_current import rebuild_search_current
+from paperscout.storage import LocalStore
 
 
 class _FakeOpenAIResponse:
@@ -254,7 +254,7 @@ def _seed_fixture_data(tmp_path: Path) -> Settings:
             ],
         },
     ]
-    from paper_search_agent.models import PaperRecord
+    from paperscout.models import PaperRecord
 
     papers = []
     for spec in paper_specs:
@@ -295,12 +295,12 @@ def _refresh_search_current(settings: Settings) -> None:
 def _enable_mocked_api(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_MODEL", "gpt-5.4-mini")
-    monkeypatch.setattr("paper_search_agent.planner.httpx.Client", _FakeOpenAIClient)
-    monkeypatch.setattr("paper_search_agent.search.httpx.Client", _FakeOpenAIClient)
-    monkeypatch.setattr("paper_search_agent.encoders.SentenceTransformerEncoder.__init__", _fake_encoder_init)
-    monkeypatch.setattr("paper_search_agent.encoders.SentenceTransformerEncoder.encode", _fake_encoder_encode)
-    monkeypatch.setattr("paper_search_agent.reranker.CrossEncoderReranker.__init__", _fake_reranker_init)
-    monkeypatch.setattr("paper_search_agent.reranker.CrossEncoderReranker.score_pairs", _fake_reranker_scores)
+    monkeypatch.setattr("paperscout.planner.httpx.Client", _FakeOpenAIClient)
+    monkeypatch.setattr("paperscout.search.httpx.Client", _FakeOpenAIClient)
+    monkeypatch.setattr("paperscout.encoders.SentenceTransformerEncoder.__init__", _fake_encoder_init)
+    monkeypatch.setattr("paperscout.encoders.SentenceTransformerEncoder.encode", _fake_encoder_encode)
+    monkeypatch.setattr("paperscout.reranker.CrossEncoderReranker.__init__", _fake_reranker_init)
+    monkeypatch.setattr("paperscout.reranker.CrossEncoderReranker.score_pairs", _fake_reranker_scores)
 
 
 def _write_image_fixture(settings: Settings, paper_id: str, image_name: str) -> Path:
@@ -421,7 +421,7 @@ def test_query_planner_rejects_blank_bucket_queries_and_duplicate_ids(tmp_path: 
 def test_search_returns_grouped_results_and_trace(tmp_path: Path, monkeypatch) -> None:
     _enable_mocked_api(monkeypatch)
     settings = _seed_fixture_data(tmp_path)
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(settings.data_dir))
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(settings.data_dir))
     store = LocalStore(settings)
     _build_and_refresh_search_current(settings, store)
 
@@ -487,8 +487,8 @@ def test_search_does_not_fabricate_zero_signal_sections_or_evidence(tmp_path: Pa
     store = LocalStore(settings)
     _build_and_refresh_search_current(settings, store)
 
-    from paper_search_agent.models import EvidenceBucket, QueryAspect, QueryPlan, ScopeConstraints, VerifierRubric
-    from paper_search_agent.search import SearchEngine
+    from paperscout.models import EvidenceBucket, QueryAspect, QueryPlan, ScopeConstraints, VerifierRubric
+    from paperscout.search import SearchEngine
 
     engine = SearchEngine(settings, store)
     engine.load()
@@ -525,7 +525,7 @@ def test_search_does_not_fabricate_zero_signal_sections_or_evidence(tmp_path: Pa
 def test_api_search_matches_cli_top_satisfied_result(tmp_path: Path, monkeypatch) -> None:
     _enable_mocked_api(monkeypatch)
     settings = _seed_fixture_data(tmp_path)
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(settings.data_dir))
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(settings.data_dir))
     store = LocalStore(settings)
     _build_and_refresh_search_current(settings, store)
 
@@ -573,11 +573,11 @@ def test_api_search_matches_cli_top_satisfied_result(tmp_path: Path, monkeypatch
 def test_search_result_includes_main_image_url_and_optional_enrichment_fields(tmp_path: Path, monkeypatch) -> None:
     _enable_mocked_api(monkeypatch)
     settings = _seed_fixture_data(tmp_path)
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(settings.data_dir))
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(settings.data_dir))
     store = LocalStore(settings)
     _build_and_refresh_search_current(settings, store)
 
-    from paper_search_agent.models import ObjectRecord
+    from paperscout.models import ObjectRecord
 
     image_path = _write_image_fixture(settings, "acl2025.test.3", "overview.png")
     store.save_objects(
@@ -615,13 +615,13 @@ def test_search_result_includes_main_image_url_and_optional_enrichment_fields(tm
 
 def test_main_image_url_can_use_public_api_base_url(tmp_path: Path, monkeypatch) -> None:
     _enable_mocked_api(monkeypatch)
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_PUBLIC_API_BASE_URL", "https://demo.example/api")
+    monkeypatch.setenv("PAPERSCOUT_PUBLIC_API_BASE_URL", "https://demo.example/api")
     settings = _seed_fixture_data(tmp_path)
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(settings.data_dir))
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(settings.data_dir))
     store = LocalStore(settings)
     _build_and_refresh_search_current(settings, store)
 
-    from paper_search_agent.models import ObjectRecord
+    from paperscout.models import ObjectRecord
 
     image_path = _write_image_fixture(settings, "acl2025.test.3", "public.png")
     store.save_objects(
@@ -655,11 +655,11 @@ def test_main_image_url_can_use_public_api_base_url(tmp_path: Path, monkeypatch)
 
 def test_api_serves_paper_image_asset(tmp_path: Path, monkeypatch) -> None:
     settings = _seed_fixture_data(tmp_path)
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(settings.data_dir))
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(settings.data_dir))
     store = LocalStore(settings)
     _build_and_refresh_search_current(settings, store)
 
-    from paper_search_agent.models import ObjectRecord
+    from paperscout.models import ObjectRecord
 
     image_path = _write_image_fixture(settings, "acl2025.test.3", "figure_1.png")
     store.save_objects(
@@ -690,11 +690,11 @@ def test_api_serves_paper_image_asset(tmp_path: Path, monkeypatch) -> None:
 def test_image_urls_keep_relative_paths_to_avoid_basename_collisions(tmp_path: Path, monkeypatch) -> None:
     _enable_mocked_api(monkeypatch)
     settings = _seed_fixture_data(tmp_path)
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(settings.data_dir))
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(settings.data_dir))
     store = LocalStore(settings)
     _build_and_refresh_search_current(settings, store)
 
-    from paper_search_agent.models import ObjectRecord
+    from paperscout.models import ObjectRecord
 
     primary_image = _write_image_fixture(settings, "acl2025.test.3", "figure_1.png")
     alt_image = settings.mineru_output_dir / "acl2025.test.3" / "alt" / "figure_1.png"
@@ -749,7 +749,7 @@ def test_image_urls_keep_relative_paths_to_avoid_basename_collisions(tmp_path: P
 def test_invalid_cached_enrichment_is_ignored(tmp_path: Path, monkeypatch) -> None:
     _enable_mocked_api(monkeypatch)
     settings = _seed_fixture_data(tmp_path)
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(settings.data_dir))
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(settings.data_dir))
     store = LocalStore(settings)
     _build_and_refresh_search_current(settings, store)
 
@@ -794,7 +794,7 @@ output_dir = "data/parsed/mineru"
         encoding="utf-8",
     )
     override_dir = tmp_path / "override_data"
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(override_dir))
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(override_dir))
 
     settings = Settings.from_env(root)
 
@@ -872,10 +872,10 @@ def test_verifier_repairs_invalid_entity_role_with_llm_retry(tmp_path: Path, mon
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_MODEL", "gpt-5.4-mini")
-    monkeypatch.setattr("paper_search_agent.search.httpx.Client", _RepairingVerifierClient)
+    monkeypatch.setattr("paperscout.search.httpx.Client", _RepairingVerifierClient)
 
-    from paper_search_agent.models import EvidenceBucket, PaperRecord, QueryAspect, QueryPlan, ScopeConstraints, VerifierRubric
-    from paper_search_agent.search import SearchEngine
+    from paperscout.models import EvidenceBucket, PaperRecord, QueryAspect, QueryPlan, ScopeConstraints, VerifierRubric
+    from paperscout.search import SearchEngine
 
     settings = Settings.from_env(tmp_path)
     engine = SearchEngine(settings, LocalStore(settings))
@@ -949,10 +949,10 @@ def test_verifier_payload_preserves_bucket_semantics(tmp_path: Path, monkeypatch
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_MODEL", "gpt-5.4-mini")
-    monkeypatch.setattr("paper_search_agent.search.httpx.Client", _RecordingVerifierClient)
+    monkeypatch.setattr("paperscout.search.httpx.Client", _RecordingVerifierClient)
 
-    from paper_search_agent.models import EvidenceBucket, EvidenceChunk, PaperRecord, QueryPlan, ScopeConstraints, VerifierRubric
-    from paper_search_agent.search import SearchEngine
+    from paperscout.models import EvidenceBucket, EvidenceChunk, PaperRecord, QueryPlan, ScopeConstraints, VerifierRubric
+    from paperscout.search import SearchEngine
 
     settings = Settings.from_env(tmp_path)
     engine = SearchEngine(settings, LocalStore(settings))
@@ -1077,7 +1077,7 @@ def test_layout_parser_builds_sections_objects_and_drops_references(tmp_path: Pa
         encoding="utf-8",
     )
 
-    from paper_search_agent.models import PaperRecord
+    from paperscout.models import PaperRecord
 
     bundle = PDFParser(settings).parse(
         PaperRecord(
@@ -1144,7 +1144,7 @@ def test_layout_parser_does_not_consume_table_supplement_on_empty_block(tmp_path
         encoding="utf-8",
     )
 
-    from paper_search_agent.models import PaperRecord
+    from paperscout.models import PaperRecord
 
     bundle = PDFParser(settings).parse(
         PaperRecord(
@@ -1190,7 +1190,7 @@ def test_settings_loads_config_toml_and_env_override(tmp_path: Path, monkeypatch
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_PAPER_DENSE_MODEL", "env-paper-model")
+    monkeypatch.setenv("PAPERSCOUT_PAPER_DENSE_MODEL", "env-paper-model")
     settings = Settings.from_env(tmp_path)
 
     assert settings.pdf_parser_backend == "mineru_layout"
@@ -1224,11 +1224,11 @@ model = ""
 
 
 def test_index_builder_records_parse_failures_without_fallback(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("paper_search_agent.encoders.SentenceTransformerEncoder.__init__", _fake_encoder_init)
-    monkeypatch.setattr("paper_search_agent.encoders.SentenceTransformerEncoder.encode", _fake_encoder_encode)
+    monkeypatch.setattr("paperscout.encoders.SentenceTransformerEncoder.__init__", _fake_encoder_init)
+    monkeypatch.setattr("paperscout.encoders.SentenceTransformerEncoder.encode", _fake_encoder_encode)
     settings = Settings.from_env(tmp_path)
     store = LocalStore(settings)
-    from paper_search_agent.models import PaperRecord
+    from paperscout.models import PaperRecord
 
     store.save_raw_papers(
         [
@@ -1369,7 +1369,7 @@ def test_acl_ingestor_does_not_expand_long_or_short_to_full_main_family(tmp_path
 
 
 def test_normalized_phrase_match_respects_token_boundaries() -> None:
-    from paper_search_agent.search import _contains_normalized_phrase
+    from paperscout.search import _contains_normalized_phrase
 
     assert _contains_normalized_phrase("results on gaia benchmark", "gaia")
     assert _contains_normalized_phrase("results on gaia benchmark", "gaia benchmark")

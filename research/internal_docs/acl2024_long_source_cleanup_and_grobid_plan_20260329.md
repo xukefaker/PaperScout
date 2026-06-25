@@ -18,7 +18,7 @@
 
 ### 1. `Front Matter` 进入正式 section/chunk
 
-当前 [pdf_parser.py](/home/kexu/projects/PaperSearchAgent/src/paper_search_agent/pdf_parser.py) 在“还没有进入任何正式 section，但已经读到 object block”时，会调用 `_ensure_current_section()` 创建一个人工 section：
+当前 [pdf_parser.py](/home/kexu/projects/PaperScout/src/paperscout/pdf_parser.py) 在“还没有进入任何正式 section，但已经读到 object block”时，会调用 `_ensure_current_section()` 创建一个人工 section：
 
 - `section_title = "Front Matter"`
 - `section_path = ["Front Matter"]`
@@ -46,7 +46,7 @@
 
 ### 3. authorship enrichment 对复杂 marker 失败
 
-当前 [offline.py](/home/kexu/projects/PaperSearchAgent/src/paper_search_agent/offline.py) 的 enrichment 阶段会：
+当前 [offline.py](/home/kexu/projects/PaperScout/src/paperscout/offline.py) 的 enrichment 阶段会：
 
 1. 重新 `parser.parse(paper)`
 2. 调用 `extract_author_metadata(bundle.paper, bundle.objects)`
@@ -77,7 +77,7 @@
 
 #### 改法
 
-在 [pdf_parser.py](/home/kexu/projects/PaperSearchAgent/src/paper_search_agent/pdf_parser.py) 中：
+在 [pdf_parser.py](/home/kexu/projects/PaperScout/src/paperscout/pdf_parser.py) 中：
 
 1. 删除 `_ensure_current_section()` 自动创建 `Front Matter` 的行为
 2. 对于尚未进入正式 section 的 object block：
@@ -100,7 +100,7 @@
 
 #### 改法
 
-在 [acl_anthology.py](/home/kexu/projects/PaperSearchAgent/src/paper_search_agent/acl_anthology.py) 中：
+在 [acl_anthology.py](/home/kexu/projects/PaperScout/src/paperscout/acl_anthology.py) 中：
 
 1. event page 仍负责发现 paper list、authors、abstract、pdf_url
 2. 对每篇 paper 再抓一次对应 paper page，抽取权威 title
@@ -162,7 +162,7 @@
 
 #### 接入位置
 
-在 [offline.py](/home/kexu/projects/PaperSearchAgent/src/paper_search_agent/offline.py) 的 `OfflineEnrichmentRunner.run()` 中：
+在 [offline.py](/home/kexu/projects/PaperScout/src/paperscout/offline.py) 的 `OfflineEnrichmentRunner.run()` 中：
 
 当前：
 
@@ -208,22 +208,22 @@
 
 ### 1. ingest
 
-- [acl_anthology.py](/home/kexu/projects/PaperSearchAgent/src/paper_search_agent/acl_anthology.py)
+- [acl_anthology.py](/home/kexu/projects/PaperScout/src/paperscout/acl_anthology.py)
 
 ### 2. parser / build_prepare
 
-- [pdf_parser.py](/home/kexu/projects/PaperSearchAgent/src/paper_search_agent/pdf_parser.py)
+- [pdf_parser.py](/home/kexu/projects/PaperScout/src/paperscout/pdf_parser.py)
 
 ### 3. enrichment
 
-- [offline.py](/home/kexu/projects/PaperSearchAgent/src/paper_search_agent/offline.py)
+- [offline.py](/home/kexu/projects/PaperScout/src/paperscout/offline.py)
 - 新增 `grobid_client` 模块
 - 可能新增 `tei parsing` 辅助模块
 
 ### 4. config
 
-- [config.toml](/home/kexu/projects/PaperSearchAgent/config.toml)
-- [config.py](/home/kexu/projects/PaperSearchAgent/src/paper_search_agent/config.py)
+- [config.toml](/home/kexu/projects/PaperScout/config.toml)
+- [config.py](/home/kexu/projects/PaperScout/src/paperscout/config.py)
 
 新增 GROBID 配置项，例如：
 
@@ -340,5 +340,5 @@
   - 安装 `openjdk-17-jdk-headless`
   - 用 `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64` 启动 GROBID
 - 离线 build 与在线 demo 不能同时稳定共用当前 8GB 显存
-  - 本次一次真实 OOM 原因是 `PaperSearchAgent` 后端服务占用约 `3.1 GiB` GPU 显存
+  - 本次一次真实 OOM 原因是 `PaperScout` 后端服务占用约 `3.1 GiB` GPU 显存
   - 为继续 build，已临时停止 demo 前后端

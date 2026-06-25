@@ -21,7 +21,7 @@ const scholarFont = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: "PaperSearchAgent",
+  title: "PaperScout",
   description: "Evidence-aware scholarly paper search demo for ACL-family venues.",
 };
 

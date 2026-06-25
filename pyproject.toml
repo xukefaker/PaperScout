@@ -3,9 +3,9 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "paper-search-agent"
+name = "paperscout"
 version = "0.1.0"
-description = "Conference paper search agent with hierarchical retrieval and evidence-aware reranking."
+description = "Local paper search and evidence-grounded Q&A for your PDF library."
 requires-python = ">=3.11,<3.13"
 dependencies = [
   "accelerate>=1.13.0",
@@ -30,10 +30,10 @@ dev = [
 ]
 
 [project.scripts]
-paper-search-agent = "paper_search_agent.cli:app"
+paperscout = "paperscout.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/paper_search_agent"]
+packages = ["src/paperscout"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

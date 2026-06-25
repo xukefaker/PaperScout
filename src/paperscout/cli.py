@@ -188,13 +188,13 @@ def init_project(force_env: bool = typer.Option(False, "--force-env", help="Over
     else:
         env_path.write_text(
             "OPENAI_API_KEY=\nOPENAI_BASE_URL=https://api.openai.com/v1\nOPENAI_MODEL=\n"
-            "PAPER_SEARCH_AGENT_DATA_DIR=./data\n",
+            "PAPERSCOUT_DATA_DIR=./data\n",
             encoding="utf-8",
         )
         typer.echo(f"Wrote {env_path}")
     settings = Settings.from_env(root_dir=root, corpus=_personal_corpus())
     settings.ensure_dirs()
-    typer.echo(f"Initialized PaperSearchAgent at {root}")
+    typer.echo(f"Initialized PaperScout at {root}")
 
 
 @app.command("add-pdfs")
@@ -253,7 +253,7 @@ def index_personal_library(
     store = LocalStore(settings)
     source_papers = store.load_source_papers()
     if not source_papers:
-        raise RuntimeError("No PDFs are registered. Run `paper-search-agent add-pdfs ./your-pdfs` first.")
+        raise RuntimeError("No PDFs are registered. Run `paperscout add-pdfs ./your-pdfs` first.")
 
     if run_parse:
         from .mineru_pipeline import run_mineru_pipeline
@@ -286,7 +286,7 @@ def web(
         typer.echo(f"Web app not found: {web_dir}", err=True)
         raise typer.Exit(code=1)
     if not settings.search_current_manifest_path.exists():
-        typer.echo("No online index found. Run `paper-search-agent index` before starting the web app.", err=True)
+        typer.echo("No online index found. Run `paperscout index` before starting the web app.", err=True)
         raise typer.Exit(code=1)
     if shutil.which("npm") is None:
         typer.echo("npm is required to start the web app.", err=True)
@@ -295,14 +295,14 @@ def web(
         subprocess.run(["npm", "--prefix", str(web_dir), "install"], cwd=root, check=True)
 
     env = os.environ.copy()
-    env["PAPER_SEARCH_AGENT_ROOT"] = str(root)
-    env["PAPER_SEARCH_AGENT_API_BASE_URL"] = f"http://127.0.0.1:{api_port}/api"
+    env["PAPERSCOUT_ROOT"] = str(root)
+    env["PAPERSCOUT_API_BASE_URL"] = f"http://127.0.0.1:{api_port}/api"
     api_process = subprocess.Popen(
         [
             sys.executable,
             "-m",
             "uvicorn",
-            "paper_search_agent.api.app:create_app",
+            "paperscout.api.app:create_app",
             "--factory",
             "--host",
             host,
@@ -317,7 +317,7 @@ def web(
         cwd=root,
         env=env,
     )
-    typer.echo(f"PaperSearchAgent web: http://{host}:{web_port}")
+    typer.echo(f"PaperScout web: http://{host}:{web_port}")
     raise typer.Exit(code=_run_until_exit([api_process, web_process]))
 
 
@@ -339,7 +339,7 @@ def demo_acl(
     _write_search_current_scope([settings.corpus])
     typer.echo(summary.model_dump_json(indent=2))
     typer.echo(f"Downloaded PDFs are under {settings.pdf_dir / 'acl' / str(year) / corpus_track}")
-    typer.echo("Next: run `paper-search-agent index`, then `paper-search-agent web`.")
+    typer.echo("Next: run `paperscout index`, then `paperscout web`.")
 
 
 @app.command("ingest-acl", hidden=True)

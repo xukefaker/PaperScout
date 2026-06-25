@@ -24,7 +24,7 @@ def configure_terminal_logging() -> None:
     if _CONFIGURED:
         return
 
-    level_name = os.getenv("PAPER_SEARCH_AGENT_LOG_LEVEL", "INFO").upper()
+    level_name = os.getenv("PAPERSCOUT_LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
     console = Console(stderr=True, soft_wrap=True)
     handler = RichHandler(

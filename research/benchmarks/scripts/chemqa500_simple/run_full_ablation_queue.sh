@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="/workspace/PaperSearchAgent"
+PROJECT_ROOT="/workspace/PaperScout"
 PYTHON_BIN="$PROJECT_ROOT/.venv/bin/python"
 BENCHMARK_ROOT="$PROJECT_ROOT/data/benchmarks/chemqa500_simple/package"
 ANNOTATION_FILE="$PROJECT_ROOT/data/benchmarks/chemqa500_simple/ablation/input/chemqa500_search_benchmark_for_runner.jsonl"
@@ -12,9 +12,9 @@ CORPUS_KEY="chemqa500_simple/2026/all"
 
 cd "$PROJECT_ROOT"
 mkdir -p "$RUN_ROOT" "$LOG_ROOT" "$(dirname "$ANNOTATION_FILE")"
-export PAPER_SEARCH_AGENT_VENUE="chemqa500_simple"
-export PAPER_SEARCH_AGENT_YEAR="2026"
-export PAPER_SEARCH_AGENT_TRACK="all"
+export PAPERSCOUT_VENUE="chemqa500_simple"
+export PAPERSCOUT_YEAR="2026"
+export PAPERSCOUT_TRACK="all"
 export TOKENIZERS_PARALLELISM="false"
 export PYTHONUNBUFFERED="1"
 
@@ -25,13 +25,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from paper_search_agent.config import CorpusSpec, Settings
-from paper_search_agent.indexer import IndexBuilder
-from paper_search_agent.mineru_pipeline import artifact_complete, normalize_failure_entries, run_mineru_pipeline
-from paper_search_agent.models import PaperRecord
-from paper_search_agent.search_current import rebuild_search_current
-from paper_search_agent.storage import LocalStore
-from paper_search_agent.utils import now_iso
+from paperscout.config import CorpusSpec, Settings
+from paperscout.indexer import IndexBuilder
+from paperscout.mineru_pipeline import artifact_complete, normalize_failure_entries, run_mineru_pipeline
+from paperscout.models import PaperRecord
+from paperscout.search_current import rebuild_search_current
+from paperscout.storage import LocalStore
+from paperscout.utils import now_iso
 
 project_root = Path("$PROJECT_ROOT")
 benchmark_root = Path("$BENCHMARK_ROOT")

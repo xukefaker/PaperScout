@@ -11,16 +11,16 @@ fi
 
 case "$SUBCOMMAND" in
   run)
-    exec .venv/bin/paper-search-agent offline-run "$@"
+    exec .venv/bin/paperscout offline-run "$@"
     ;;
   enrich)
-    exec .venv/bin/paper-search-agent offline-enrich "$@"
+    exec .venv/bin/paperscout offline-enrich "$@"
     ;;
   pause)
-    exec .venv/bin/paper-search-agent offline-pause "$@"
+    exec .venv/bin/paperscout offline-pause "$@"
     ;;
   status)
-    exec .venv/bin/paper-search-agent offline-status "$@"
+    exec .venv/bin/paperscout offline-status "$@"
     ;;
   *)
     echo "Usage: ./offline.sh {run|enrich|pause|status} [args...]" >&2

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from paper_search_agent.config import Settings
+from paperscout.config import Settings
 
 
 class _NoopSearchEngine:
@@ -75,10 +75,10 @@ model = "gpt-5.4-mini"
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(tmp_path / "data"))
     _write_search_current_snapshot(tmp_path, build_id="build-a", papers=0)
 
-    app_module = importlib.import_module("paper_search_agent.api.app")
+    app_module = importlib.import_module("paperscout.api.app")
     monkeypatch.setattr(app_module, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(app_module, "SearchEngine", _NoopSearchEngine)
     monkeypatch.setattr(app_module, "DeepChatService", _NoopDeepChatService)

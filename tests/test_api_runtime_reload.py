@@ -8,9 +8,9 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-from paper_search_agent.config import CorpusSpec, Settings
-from paper_search_agent.models import QueryPlan, SearchResponse, SearchTrace
-from paper_search_agent.storage import LocalStore
+from paperscout.config import CorpusSpec, Settings
+from paperscout.models import QueryPlan, SearchResponse, SearchTrace
+from paperscout.storage import LocalStore
 
 
 class _NoopSearchEngine:
@@ -101,8 +101,8 @@ model = "gpt-5.4-mini"
     """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(tmp_path / "data"))
-    app_module = importlib.import_module("paper_search_agent.api.app")
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(tmp_path / "data"))
+    app_module = importlib.import_module("paperscout.api.app")
     monkeypatch.setattr(app_module, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(app_module, "SearchEngine", _NoopSearchEngine)
     monkeypatch.setattr(app_module, "DeepChatService", _NoopDeepChatService)
@@ -131,8 +131,8 @@ model = "gpt-5.4-mini"
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(tmp_path / "data"))
-    app_module = importlib.import_module("paper_search_agent.api.app")
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(tmp_path / "data"))
+    app_module = importlib.import_module("paperscout.api.app")
     monkeypatch.setattr(app_module, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(app_module, "SearchEngine", _SnapshotSearchEngine)
     monkeypatch.setattr(app_module, "DeepChatService", _NoopDeepChatService)
@@ -161,8 +161,8 @@ model = "gpt-5.4-mini"
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(tmp_path / "data"))
-    app_module = importlib.import_module("paper_search_agent.api.app")
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(tmp_path / "data"))
+    app_module = importlib.import_module("paperscout.api.app")
     monkeypatch.setattr(app_module, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(app_module, "SearchEngine", _JobSearchEngine)
     monkeypatch.setattr(app_module, "DeepChatService", _NoopDeepChatService)
@@ -197,8 +197,8 @@ model = "gpt-5.4-mini"
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(tmp_path / "data"))
-    app_module = importlib.import_module("paper_search_agent.api.app")
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(tmp_path / "data"))
+    app_module = importlib.import_module("paperscout.api.app")
     monkeypatch.setattr(app_module, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(app_module, "SearchEngine", _NoopSearchEngine)
     monkeypatch.setattr(app_module, "DeepChatService", _NoopDeepChatService)
@@ -227,8 +227,8 @@ model = "gpt-5.4-mini"
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("PAPER_SEARCH_AGENT_DATA_DIR", str(tmp_path / "data"))
-    app_module = importlib.import_module("paper_search_agent.api.app")
+    monkeypatch.setenv("PAPERSCOUT_DATA_DIR", str(tmp_path / "data"))
+    app_module = importlib.import_module("paperscout.api.app")
     monkeypatch.setattr(app_module, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(app_module, "SearchEngine", _SnapshotSearchEngine)
     monkeypatch.setattr(app_module, "DeepChatService", _TrackCloseDeepChatService)

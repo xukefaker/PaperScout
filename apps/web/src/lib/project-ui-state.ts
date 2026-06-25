@@ -1,5 +1,5 @@
 const STORAGE_KEYS = {
-  currentProjectId: 'papersearchagent.workspace.current_project_id',
+  currentProjectId: 'paperscout.workspace.current_project_id',
 } as const;
 
 function canUseStorage(): boolean {

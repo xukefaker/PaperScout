@@ -1,23 +1,35 @@
-# PaperSearchAgent
+# PaperScout
 
 English | [简体中文](README.zh-CN.md)
 
-Local paper search from your own PDFs. Add PDFs, build an index, open the web UI, ask questions.
+Local paper search from your own PDFs. Add papers, build an evidence-aware index, open the web UI, and ask questions.
 
 ## Quick Start
 
-Requirements: Python 3.11/3.12, Node.js 20+, and an OpenAI-compatible API key.
+Requirements: uv, Node.js 20+, and an OpenAI-compatible API key. PaperScout uses uv for Python environment management.
+
+Install uv if needed:
+
+```powershell
+# Windows PowerShell
+winget install --id=astral-sh.uv -e
+```
 
 ```bash
-git clone -b public-release --single-branch https://github.com/xukefaker/PaperSearchAgent.git
-cd PaperSearchAgent
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -e .
+Then install and run PaperScout:
 
-paper-search-agent init
+```bash
+git clone https://github.com/xukefaker/PaperScout.git
+cd PaperScout
+
+uv python install 3.12
+uv sync
+
+uv run paperscout init
 
 # edit .env:
 # OPENAI_API_KEY=sk-...
@@ -26,9 +38,9 @@ paper-search-agent init
 mkdir -p pdfs
 # put your PDFs in ./pdfs
 
-paper-search-agent add-pdfs ./pdfs
-paper-search-agent index
-paper-search-agent web
+uv run paperscout add-pdfs ./pdfs
+uv run paperscout index
+uv run paperscout web
 ```
 
 Open `http://127.0.0.1:4000`.
@@ -38,14 +50,15 @@ Open `http://127.0.0.1:4000`.
 No PDFs yet? Download 100 ACL 2025 long papers:
 
 ```bash
-paper-search-agent demo-acl --max-papers 100
-paper-search-agent index
-paper-search-agent web
+uv run paperscout demo-acl --max-papers 100
+uv run paperscout index
+uv run paperscout web
 ```
 
 ## Notes
 
+- uv creates the Python environment in `.venv/` under the project root.
 - PDFs and indexes stay under `data/` by default.
 - Questions are sent to your configured OpenAI-compatible API.
 - CPU works for small collections; CUDA is recommended for larger PDF sets.
-- The first `paper-search-agent web` run installs frontend dependencies in `apps/web` if needed.
+- The first `uv run paperscout web` run installs frontend dependencies in `apps/web` if needed.

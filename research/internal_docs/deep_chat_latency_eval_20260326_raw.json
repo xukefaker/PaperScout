@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-03-26T22:38:24.765987+00:00",
-  "project_root": "/home/kexu/projects/PaperSearchAgent",
+  "project_root": "/home/kexu/projects/PaperScout",
   "model": "gpt-5.4-mini",
   "base_url": "https://api.openai.com/v1",
   "deep_chat_config": {

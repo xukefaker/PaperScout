@@ -558,15 +558,15 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--benchmark-jsonl",
-        default="/workspace/PaperSearchAgent/data/benchmarks/chemqa40/ablation/input/chemqa40_search_benchmark_final.jsonl",
+        default="/workspace/PaperScout/data/benchmarks/chemqa40/ablation/input/chemqa40_search_benchmark_final.jsonl",
     )
     parser.add_argument(
         "--parsed-root",
-        default="/workspace/PaperSearchAgent/data/parsed/mineru",
+        default="/workspace/PaperScout/data/parsed/mineru",
     )
     parser.add_argument(
         "--out-root",
-        default="/workspace/PaperSearchAgent/data/benchmarks/chemqa40/baseline_inputs",
+        default="/workspace/PaperScout/data/benchmarks/chemqa40/baseline_inputs",
     )
     args = parser.parse_args()
 

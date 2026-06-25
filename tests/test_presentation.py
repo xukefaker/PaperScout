@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from paper_search_agent.models import ObjectRecord, PaperRecord
-from paper_search_agent.presentation import (
+from paperscout.models import ObjectRecord, PaperRecord
+from paperscout.presentation import (
     build_matched_sections_summary,
     extract_author_metadata,
     structure_rationale_text,

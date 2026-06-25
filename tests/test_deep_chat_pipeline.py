@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from paper_search_agent.deep_chat.evidence import DeepChatEvidenceMaterializer
-from paper_search_agent.models import ChunkRecord, ObjectRecord, PaperRecord, SectionRecord
+from paperscout.deep_chat.evidence import DeepChatEvidenceMaterializer
+from paperscout.models import ChunkRecord, ObjectRecord, PaperRecord, SectionRecord
 
 
 def test_evidence_materializer_builds_structured_units() -> None:

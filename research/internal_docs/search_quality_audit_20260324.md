@@ -1,8 +1,8 @@
-# PaperSearchAgent 检索效果审计报告（2026-03-24）
+# PaperScout 检索效果审计报告（2026-03-24）
 
 ## 1. 审计目标
 
-本次审计的目标不是继续改代码，而是如实评估当前 `PaperSearchAgent` 在真实 query 下的检索表现，尤其关注：
+本次审计的目标不是继续改代码，而是如实评估当前 `PaperScout` 在真实 query 下的检索表现，尤其关注：
 
 1. 对单目标、明确描述的科研检索 query，系统是否能稳定找对论文。
 2. 对涉及正文细节、实验设置、表格内容的 query，系统是否仍然能锁定目标论文。
@@ -40,7 +40,7 @@
 ### 2.3 测试环境
 
 - 远程机器：`kexu@192.168.1.105`
-- 运行目录：`/home/kexu/projects/PaperSearchAgent`
+- 运行目录：`/home/kexu/projects/PaperScout`
 - 测试方式：CLI 真实运行，不 mock、不改代码
 
 ---
@@ -454,7 +454,7 @@ Top satisfied 包括：
 
 如果现在要给当前系统一个阶段性结论，我会写成：
 
-> 当前 PaperSearchAgent 已经在 ACL 2025 long 这一封闭语料上展示出较强的目标论文锁定能力，尤其在 benchmark-oriented、evaluation-oriented 以及正文细节驱动的自然语言 query 上，能够稳定返回相关论文与 supporting evidence。其主要短板已从“检索不到”转移到“宽 query 下排序与判定边界不够尖锐”“整体推理延迟较高”“8GB GPU 下工程稳健性不足”。
+> 当前 PaperScout 已经在 ACL 2025 long 这一封闭语料上展示出较强的目标论文锁定能力，尤其在 benchmark-oriented、evaluation-oriented 以及正文细节驱动的自然语言 query 上，能够稳定返回相关论文与 supporting evidence。其主要短板已从“检索不到”转移到“宽 query 下排序与判定边界不够尖锐”“整体推理延迟较高”“8GB GPU 下工程稳健性不足”。
 
 这个结论是偏积极的，但不夸大。
 

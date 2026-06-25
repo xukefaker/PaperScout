@@ -7,9 +7,9 @@ export type WorkspaceUiState = {
 };
 
 const STORAGE_KEYS = {
-  desktopSplitPct: 'papersearchagent.workspace.desktop_split_pct',
-  mobilePane: 'papersearchagent.workspace.mobile_pane',
-  rationaleOpen: 'papersearchagent.workspace.rationale_open',
+  desktopSplitPct: 'paperscout.workspace.desktop_split_pct',
+  mobilePane: 'paperscout.workspace.mobile_pane',
+  rationaleOpen: 'paperscout.workspace.rationale_open',
 } as const;
 
 const DEFAULT_STATE: WorkspaceUiState = {

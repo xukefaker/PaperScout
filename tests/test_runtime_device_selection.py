@@ -3,8 +3,8 @@ from __future__ import annotations
 import sys
 import types
 
-from paper_search_agent.encoders import EncoderConfig, SentenceTransformerEncoder
-from paper_search_agent.reranker import CrossEncoderReranker, RerankerConfig
+from paperscout.encoders import EncoderConfig, SentenceTransformerEncoder
+from paperscout.reranker import CrossEncoderReranker, RerankerConfig
 
 
 def _install_fake_torch(monkeypatch, *, cuda_available: bool) -> None:

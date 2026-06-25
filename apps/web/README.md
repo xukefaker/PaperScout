@@ -1,16 +1,16 @@
-# PaperSearchAgent Web
+# PaperScout Web
 
-This is the Next.js frontend for PaperSearchAgent. It is normally started from the repository root:
+This is the Next.js frontend for PaperScout. It is normally started from the repository root:
 
 ```bash
-paper-search-agent web
+uv run paperscout web
 ```
 
 For frontend-only development:
 
 ```bash
 npm install
-PAPER_SEARCH_AGENT_API_BASE_URL=http://127.0.0.1:4001/api npm run dev -- --hostname 127.0.0.1 --port 4000
+PAPERSCOUT_API_BASE_URL=http://127.0.0.1:4001/api npm run dev -- --hostname 127.0.0.1 --port 4000
 ```
 
-The frontend proxies API routes to the FastAPI backend through `PAPER_SEARCH_AGENT_API_BASE_URL`.
+The frontend proxies API routes to the FastAPI backend through `PAPERSCOUT_API_BASE_URL`.
