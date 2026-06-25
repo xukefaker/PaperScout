@@ -9,7 +9,7 @@
 环境要求：Python 3.11/3.12、Node.js 20+、OpenAI 兼容 API key。
 
 ```bash
-git clone https://github.com/xukefaker/PaperSearchAgent.git
+git clone -b public-release --single-branch https://github.com/xukefaker/PaperSearchAgent.git
 cd PaperSearchAgent
 
 python -m venv .venv

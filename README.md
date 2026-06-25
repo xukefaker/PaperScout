@@ -9,7 +9,7 @@ Local paper search from your own PDFs. Add PDFs, build an index, open the web UI
 Requirements: Python 3.11/3.12, Node.js 20+, and an OpenAI-compatible API key.
 
 ```bash
-git clone https://github.com/xukefaker/PaperSearchAgent.git
+git clone -b public-release --single-branch https://github.com/xukefaker/PaperSearchAgent.git
 cd PaperSearchAgent
 
 python -m venv .venv
