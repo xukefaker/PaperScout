@@ -1,7 +1,5 @@
 # PaperSearchAgent Web
 
-English | [简体中文](README.zh-CN.md)
-
 This is the Next.js frontend for PaperSearchAgent. It is normally started from the repository root:
 
 ```bash

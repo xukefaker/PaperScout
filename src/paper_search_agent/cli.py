@@ -321,7 +321,7 @@ def web(
     raise typer.Exit(code=_run_until_exit([api_process, web_process]))
 
 
-@app.command("ingest-acl")
+@app.command("ingest-acl", hidden=True)
 def ingest_acl(
     venue: str = typer.Option(..., "--venue"),
     year: int = typer.Option(..., "--year"),
@@ -340,7 +340,7 @@ def ingest_acl(
     typer.echo(summary.model_dump_json(indent=2))
 
 
-@app.command("build-index")
+@app.command("build-index", hidden=True)
 def build_index(
     max_papers: int | None = typer.Option(None, "--max-papers", min=1),
     paper_id_file: Path | None = typer.Option(
@@ -372,7 +372,7 @@ def search(
     typer.echo(response.model_dump_json(indent=2))
 
 
-@app.command("show-paper")
+@app.command("show-paper", hidden=True)
 def show_paper(paper_id: str = typer.Argument(...)) -> None:
     _, store = _online_components()
     paper = store.get_paper(paper_id)
@@ -381,7 +381,7 @@ def show_paper(paper_id: str = typer.Argument(...)) -> None:
     typer.echo(paper.model_dump_json(indent=2))
 
 
-@app.command("inspect-trace")
+@app.command("inspect-trace", hidden=True)
 def inspect_trace(trace_id: str = typer.Argument(...)) -> None:
     _, store = _online_components()
     trace = store.load_trace(trace_id)
@@ -390,7 +390,7 @@ def inspect_trace(trace_id: str = typer.Argument(...)) -> None:
     typer.echo(trace.model_dump_json(indent=2))
 
 
-@app.command("rebuild-search-current")
+@app.command("rebuild-search-current", hidden=True)
 def rebuild_search_current_command(
     corpus: list[str] = typer.Option(
         [],
@@ -405,7 +405,7 @@ def rebuild_search_current_command(
     typer.echo(json.dumps(manifest, ensure_ascii=False, indent=2))
 
 
-@app.command("offline-run")
+@app.command("offline-run", hidden=True)
 def offline_run(
     venue: str = typer.Option("acl", "--venue"),
     year: int = typer.Option(2025, "--year"),
@@ -422,7 +422,7 @@ def offline_run(
     typer.echo(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
 
 
-@app.command("offline-enrich")
+@app.command("offline-enrich", hidden=True)
 def offline_enrich(
     venue: str = typer.Option("acl", "--venue"),
     year: int = typer.Option(2025, "--year"),
@@ -439,7 +439,7 @@ def offline_enrich(
     typer.echo(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
 
 
-@app.command("offline-pause")
+@app.command("offline-pause", hidden=True)
 def offline_pause() -> None:
     from .offline import request_pause
 
@@ -447,7 +447,7 @@ def offline_pause() -> None:
     typer.echo(json.dumps(request_pause(settings), ensure_ascii=False, indent=2))
 
 
-@app.command("offline-status")
+@app.command("offline-status", hidden=True)
 def offline_status() -> None:
     from .offline import render_status
 
