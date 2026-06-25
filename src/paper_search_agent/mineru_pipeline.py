@@ -274,7 +274,7 @@ def _run_batch(
 
 
 def _configure_mineru_env(*, settings: Settings, config: MinerUPipelineConfig) -> None:
-    os.environ["MINERU_DEVICE_MODE"] = settings.mineru_device or "cuda:0"
+    os.environ["MINERU_DEVICE_MODE"] = settings.mineru_device or "cpu"
     os.environ["MINERU_MIN_BATCH_INFERENCE_SIZE"] = str(config.min_batch_inference_size)
     os.environ["MINERU_PDF_RENDER_THREADS"] = str(config.render_threads)
     os.environ["MINERU_PDF_RENDER_TIMEOUT"] = str(config.render_timeout)

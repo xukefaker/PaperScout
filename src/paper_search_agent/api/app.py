@@ -12,6 +12,7 @@ from fastapi import FastAPI
 
 from ..config import CorpusSpec, Settings
 from ..deep_chat import DeepChatService
+from ..runtime import resolve_project_root
 from ..search import SearchEngine
 from ..storage import LocalStore
 from .jobs import SearchJobManager
@@ -257,7 +258,7 @@ class AppServiceManager:
             self._close_services(entry.services)
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = resolve_project_root()
 
 
 @asynccontextmanager

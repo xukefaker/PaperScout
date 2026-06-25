@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PaperSearchAgent Web
 
-## Getting Started
-
-First, run the development server:
+This is the Next.js frontend for PaperSearchAgent. It is normally started from the repository root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+paper-search-agent web
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+For frontend-only development:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+PAPER_SEARCH_AGENT_API_BASE_URL=http://127.0.0.1:4001/api npm run dev -- --hostname 127.0.0.1 --port 4000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The frontend proxies API routes to the FastAPI backend through `PAPER_SEARCH_AGENT_API_BASE_URL`.
 
-## Learn More
+# PaperSearchAgent Web 中文说明
 
-To learn more about Next.js, take a look at the following resources:
+这里是 PaperSearchAgent 的 Next.js 前端。通常从仓库根目录启动：
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+paper-search-agent web
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+只开发前端时：
 
-## Deploy on Vercel
+```bash
+npm install
+PAPER_SEARCH_AGENT_API_BASE_URL=http://127.0.0.1:4001/api npm run dev -- --hostname 127.0.0.1 --port 4000
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+前端会通过 `PAPER_SEARCH_AGENT_API_BASE_URL` 把 API 请求代理到 FastAPI 后端。

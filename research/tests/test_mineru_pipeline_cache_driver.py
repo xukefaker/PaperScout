@@ -8,7 +8,7 @@ import pytest
 
 
 def _load_driver_module():
-    module_path = Path(__file__).resolve().parents[1] / "scripts" / "mineru_pipeline_cache_driver.py"
+    module_path = Path(__file__).resolve().parents[1] / "internal_scripts" / "mineru_pipeline_cache_driver.py"
     spec = importlib.util.spec_from_file_location("mineru_pipeline_cache_driver", module_path)
     assert spec is not None
     assert spec.loader is not None

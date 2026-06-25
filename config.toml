@@ -17,7 +17,7 @@ backend = "pipeline"
 method = "auto"
 lang = "en"
 source = "huggingface"
-device = "cuda:0"
+device = ""
 formula = false
 table = true
 output_dir = "data/parsed/mineru"
@@ -30,8 +30,8 @@ paper_dense_model = "allenai/specter2_base"
 chunk_dense_model = "BAAI/bge-m3"
 chunk_target_tokens = 420
 chunk_overlap_tokens = 63
-dense_device = "cuda:0"
-dense_batch_size = 2
+dense_device = ""
+dense_batch_size = 8
 
 [retrieval]
 candidate_pool_size = 50
@@ -55,11 +55,11 @@ evidence_chunk_text_limit = 1200
 
 [reranker]
 model = "BAAI/bge-reranker-v2-m3"
-device = "cuda:0"
+device = ""
 batch_size = 8
 
 [openai]
-enabled = true
+enabled = false
 base_url = "https://api.openai.com/v1"
 model = "gpt-5.4-mini"
 request_timeout = 60.0

@@ -101,9 +101,9 @@ class CorpusSpec:
         normalized_venue = (venue or "acl").strip().lower()
         normalized_year = int(year or 2025)
         normalized_track = (track or "long").strip().lower()
-        if normalized_track not in {"long", "short", "demo", "all"}:
+        if normalized_track not in {"long", "short", "demo", "all", "library"}:
             raise RuntimeError(
-                f"Unsupported track={normalized_track!r}. Expected one of: long, short, demo, all."
+                f"Unsupported track={normalized_track!r}. Expected one of: long, short, demo, all, library."
             )
         return cls(venue=normalized_venue, year=normalized_year, track=normalized_track)
 

@@ -71,6 +71,7 @@ TRACK_ALIASES = {
     "findings": "findings",
     "demo": "demo",
     "industry": "industry",
+    "library": "library",
 }
 
 ENTITY_CONTEXT_MAP = {
