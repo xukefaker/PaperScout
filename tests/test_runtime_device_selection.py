@@ -3,16 +3,23 @@ from __future__ import annotations
 import sys
 import types
 
+import pytest
+
 from paperscout.config import Settings
+from paperscout.devices import require_cuda_ready
 from paperscout.encoders import EncoderConfig, SentenceTransformerEncoder
 from paperscout.reranker import CrossEncoderReranker, RerankerConfig
 
 
-def _install_fake_torch(monkeypatch, *, cuda_available: bool) -> None:
+def _install_fake_torch(monkeypatch, *, cuda_available: bool, cuda_version: str | None = "12.1") -> None:
     monkeypatch.setitem(
         sys.modules,
         "torch",
-        types.SimpleNamespace(cuda=types.SimpleNamespace(is_available=lambda: cuda_available)),
+        types.SimpleNamespace(
+            __version__="test-torch",
+            version=types.SimpleNamespace(cuda=cuda_version),
+            cuda=types.SimpleNamespace(is_available=lambda: cuda_available),
+        ),
     )
 
 
@@ -87,3 +94,10 @@ def test_settings_device_env_sets_all_runtime_devices(tmp_path, monkeypatch) -> 
     assert settings.mineru_device == "cuda"
     assert settings.dense_device == "cuda"
     assert settings.reranker_device == "cuda"
+
+
+def test_cuda_preflight_rejects_cpu_only_torch(monkeypatch) -> None:
+    _install_fake_torch(monkeypatch, cuda_available=False, cuda_version=None)
+
+    with pytest.raises(RuntimeError, match="cannot use CUDA"):
+        require_cuda_ready("cuda", purpose="MinerU PDF parsing")

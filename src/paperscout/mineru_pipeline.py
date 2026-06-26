@@ -15,6 +15,7 @@ from mineru.cli.common import do_parse, read_fn
 from mineru.utils.enum_class import MakeMode
 
 from .config import Settings
+from .devices import require_cuda_ready
 from .models import PaperRecord, ParseFailureRecord
 from .utils import now_iso
 
@@ -274,11 +275,14 @@ def _run_batch(
 
 
 def _configure_mineru_env(*, settings: Settings, config: MinerUPipelineConfig) -> None:
-    os.environ["MINERU_DEVICE_MODE"] = settings.mineru_device or "cpu"
+    device = settings.mineru_device or "cpu"
+    require_cuda_ready(device, purpose="MinerU PDF parsing")
+    os.environ["MINERU_DEVICE_MODE"] = device
     os.environ["MINERU_MIN_BATCH_INFERENCE_SIZE"] = str(config.min_batch_inference_size)
     os.environ["MINERU_PDF_RENDER_THREADS"] = str(config.render_threads)
     os.environ["MINERU_PDF_RENDER_TIMEOUT"] = str(config.render_timeout)
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 
 
 def _build_batches(items: list[BatchItem], *, max_pdfs: int, max_pages: int) -> list[list[BatchItem]]:

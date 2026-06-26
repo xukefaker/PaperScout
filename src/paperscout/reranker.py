@@ -4,10 +4,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .devices import require_cuda_ready
+
 
 def _resolve_device(device: str | None) -> str:
     explicit = (device or "").strip()
     if explicit:
+        require_cuda_ready(explicit, purpose="Reranking")
         return explicit
     try:
         import torch

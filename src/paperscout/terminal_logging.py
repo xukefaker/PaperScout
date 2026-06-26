@@ -24,6 +24,8 @@ def configure_terminal_logging() -> None:
     if _CONFIGURED:
         return
 
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     level_name = os.getenv("PAPERSCOUT_LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
     console = Console(stderr=True, soft_wrap=True)
@@ -46,5 +48,17 @@ def configure_terminal_logging() -> None:
 
     for logger_name, logger_level in _NOISY_LOGGER_LEVELS.items():
         logging.getLogger(logger_name).setLevel(logger_level)
+
+    try:
+        from loguru import logger as loguru_logger
+
+        def _loguru_sink(message: object) -> None:
+            record = message.record
+            logging.getLogger(str(record["name"])).log(int(record["level"].no), str(record["message"]))
+
+        loguru_logger.remove()
+        loguru_logger.add(_loguru_sink, level=os.getenv("PAPERSCOUT_THIRD_PARTY_LOG_LEVEL", "WARNING").upper())
+    except Exception:
+        pass
 
     _CONFIGURED = True

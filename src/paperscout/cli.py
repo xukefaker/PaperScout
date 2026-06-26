@@ -13,9 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from .acl_anthology import ACLAnthologyIngestor
 from .config import CorpusSpec, Settings
+from .devices import require_cuda_ready, torch_cuda_report
 from .indexer import IndexBuilder
 from .models import PaperRecord
 from .runtime import resolve_project_root
@@ -38,6 +42,11 @@ def _components() -> tuple[Settings, LocalStore]:
     settings = Settings.from_env(root_dir=_project_root())
     store = LocalStore(settings)
     return settings, store
+
+
+def _exit_with_error(message: str) -> None:
+    Console(stderr=True).print(Panel(message, title="PaperScout cannot continue", border_style="red"))
+    raise typer.Exit(code=1)
 
 
 def _online_components() -> tuple[Settings, LocalStore]:
@@ -205,6 +214,40 @@ def init_project(force_env: bool = typer.Option(False, "--force-env", help="Over
     typer.echo(f"Initialized PaperScout at {root}")
 
 
+@app.command("doctor")
+def doctor() -> None:
+    root = _project_root()
+    settings = Settings.from_env(root_dir=root)
+    report = torch_cuda_report()
+    device = settings.mineru_device or "cpu"
+    rows = [
+        ("Project root", str(root), "ok"),
+        (".env", "found" if root.joinpath(".env").exists() else "missing", "ok" if root.joinpath(".env").exists() else "warning"),
+        ("OPENAI_API_KEY", "set" if settings.openai_api_key else "missing", "ok" if settings.openai_api_key else "warning"),
+        ("Node.js", shutil.which("node") or "not found", "ok" if shutil.which("node") else "warning"),
+        ("Device", device, "ok"),
+        ("Torch", str(report["torch_version"]), "ok" if report["torch_imported"] else "error"),
+        ("Torch CUDA", str(report["torch_cuda_version"] or "none"), "ok" if report["torch_cuda_version"] else "warning"),
+        ("CUDA available", str(report["cuda_available"]), "ok" if report["cuda_available"] else "warning"),
+        ("GPU", str(report["gpu_name"] or "not visible to PyTorch"), "ok" if report["gpu_name"] else "warning"),
+    ]
+
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Check")
+    table.add_column("Value")
+    table.add_column("Status")
+    for name, value, status in rows:
+        color = {"ok": "green", "warning": "yellow", "error": "red"}[status]
+        table.add_row(name, value, f"[{color}]{status}[/]")
+    console = Console()
+    console.print(Panel(table, title="PaperScout Doctor", border_style="cyan"))
+
+    try:
+        require_cuda_ready(device, purpose="PaperScout")
+    except RuntimeError as exc:
+        _exit_with_error(str(exc))
+
+
 @app.command("add-pdfs")
 def add_pdfs(
     paths: list[Path] = typer.Argument(..., exists=True, readable=True, resolve_path=True),
@@ -257,35 +300,38 @@ def index_library(
     ),
     run_parse: bool = typer.Option(True, "--parse/--skip-parse", help="Run MinerU before building indexes."),
 ) -> None:
-    settings = (
-        Settings.from_env(root_dir=_project_root(), corpus=_personal_corpus(year))
-        if year is not None
-        else Settings.from_env(root_dir=_project_root())
-    )
-    store = LocalStore(settings)
-    source_papers = store.load_source_papers()
-    if not source_papers:
-        corpus_key = f"{settings.corpus.venue}/{settings.corpus.year}/{settings.corpus.track}"
-        raise RuntimeError(
-            f"No PDFs are registered for {corpus_key}. Run `paperscout add-pdfs ./your-pdfs` "
-            "or `paperscout demo-acl` first."
+    try:
+        settings = (
+            Settings.from_env(root_dir=_project_root(), corpus=_personal_corpus(year))
+            if year is not None
+            else Settings.from_env(root_dir=_project_root())
         )
+        store = LocalStore(settings)
+        source_papers = store.load_source_papers()
+        if not source_papers:
+            corpus_key = f"{settings.corpus.venue}/{settings.corpus.year}/{settings.corpus.track}"
+            raise RuntimeError(
+                f"No PDFs are registered for {corpus_key}. Run `paperscout add-pdfs ./your-pdfs` "
+                "or `paperscout demo-acl` first."
+            )
 
-    if run_parse:
-        from .mineru_pipeline import run_mineru_pipeline
+        if run_parse:
+            from .mineru_pipeline import run_mineru_pipeline
 
-        run_mineru_pipeline(settings=settings, papers=source_papers)
+            run_mineru_pipeline(settings=settings, papers=source_papers)
 
-    builder = IndexBuilder(settings, store)
-    paper_ids = builder.load_paper_ids(paper_id_file) if paper_id_file is not None else None
-    summary = builder.build(max_papers=max_papers, paper_ids=paper_ids)
-    if summary.indexed_papers <= 0:
-        raise RuntimeError("Index build finished with 0 indexed papers. Check MinerU/PDF parse failures before publishing.")
+        builder = IndexBuilder(settings, store)
+        paper_ids = builder.load_paper_ids(paper_id_file) if paper_id_file is not None else None
+        summary = builder.build(max_papers=max_papers, paper_ids=paper_ids)
+        if summary.indexed_papers <= 0:
+            raise RuntimeError("Index build finished with 0 indexed papers. Check MinerU/PDF parse failures before publishing.")
 
-    _write_completed_index_state(settings, summary)
-    manifest = rebuild_search_current(_project_root(), corpora=[settings.corpus])
-    _write_search_current_scope([settings.corpus])
-    typer.echo(json.dumps({"build": summary.model_dump(), "search_current": manifest}, ensure_ascii=False, indent=2))
+        _write_completed_index_state(settings, summary)
+        manifest = rebuild_search_current(_project_root(), corpora=[settings.corpus])
+        _write_search_current_scope([settings.corpus])
+        typer.echo(json.dumps({"build": summary.model_dump(), "search_current": manifest}, ensure_ascii=False, indent=2))
+    except RuntimeError as exc:
+        _exit_with_error(str(exc))
 
 
 @app.command("web")

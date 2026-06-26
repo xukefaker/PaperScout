@@ -35,7 +35,9 @@ uv run paperscout init
 # OPENAI_API_KEY=sk-...
 # OPENAI_BASE_URL=https://api.openai.com/v1
 # OPENAI_MODEL=gpt-4o-mini
-# PAPERSCOUT_DEVICE=cpu  # 如果你的 NVIDIA CUDA 环境可用，可以改成 cuda
+# PAPERSCOUT_DEVICE=cpu
+
+uv run paperscout doctor
 
 mkdir -p pdfs
 # 把你的 PDF 放进 ./pdfs
@@ -46,6 +48,9 @@ uv run paperscout web
 ```
 
 然后打开 `http://127.0.0.1:4000`。
+
+除非 `uv run paperscout doctor` 显示 `CUDA available=True`，否则保持 `PAPERSCOUT_DEVICE=cpu`。
+只有 NVIDIA 显卡还不够：项目 `.venv` 里的 PyTorch 也必须是支持 CUDA 的版本。
 
 ## 体验示例论文
 
@@ -62,5 +67,5 @@ uv run paperscout web
 - uv 会在项目根目录下创建 `.venv/`。
 - PDF 和索引默认保存在 `data/`。
 - 问题会发送到你配置的 OpenAI 兼容 API。
-- 小规模论文库可以用 CPU；大量 PDF 建议用 CUDA。
+- 小规模论文库可以用 CPU；只有 `paperscout doctor` 确认 PyTorch 能看到 CUDA 后再用 CUDA。
 - 第一次运行 `uv run paperscout web` 时，如果需要，会自动在 `apps/web` 安装前端依赖。

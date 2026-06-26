@@ -35,7 +35,9 @@ uv run paperscout init
 # OPENAI_API_KEY=sk-...
 # OPENAI_BASE_URL=https://api.openai.com/v1
 # OPENAI_MODEL=gpt-4o-mini
-# PAPERSCOUT_DEVICE=cpu  # change to cuda if your NVIDIA CUDA setup works
+# PAPERSCOUT_DEVICE=cpu
+
+uv run paperscout doctor
 
 mkdir -p pdfs
 # put your PDFs in ./pdfs
@@ -46,6 +48,9 @@ uv run paperscout web
 ```
 
 Open `http://127.0.0.1:4000`.
+
+Keep `PAPERSCOUT_DEVICE=cpu` unless `uv run paperscout doctor` shows `CUDA available=True`.
+An NVIDIA GPU is not enough by itself: the project `.venv` must also have a CUDA-enabled PyTorch build.
 
 ## Try Demo Papers
 
@@ -62,5 +67,5 @@ uv run paperscout web
 - uv creates the Python environment in `.venv/` under the project root.
 - PDFs and indexes stay under `data/` by default.
 - Questions are sent to your configured OpenAI-compatible API.
-- CPU works for small collections; CUDA is recommended for larger PDF sets.
+- CPU works for small collections. Use CUDA only after `paperscout doctor` confirms PyTorch can see it.
 - The first `uv run paperscout web` run installs frontend dependencies in `apps/web` if needed.
