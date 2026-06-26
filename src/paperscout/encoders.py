@@ -68,7 +68,7 @@ class SentenceTransformerEncoder(BaseEncoder):
             return np.empty((0, 0), dtype=np.float32)
 
         batch_size = max(1, int(self.config.batch_size))
-        outer_batch_size = max(batch_size * 16, batch_size)
+        outer_batch_size = batch_size
         chunks: list[np.ndarray] = []
         total = len(texts)
         completed = 0

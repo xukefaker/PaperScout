@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -32,10 +33,18 @@ ENCODE_LABELS = {
 
 
 class IndexBuilder:
-    def __init__(self, settings: Settings, store: LocalStore, *, cancel_check: Callable[[], None] | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        store: LocalStore,
+        *,
+        cancel_check: Callable[[], None] | None = None,
+        progress: Any | None = None,
+    ) -> None:
         self.settings = settings
         self.store = store
         self.cancel_check = cancel_check
+        self.progress = progress
         self.deep_chat_store = DeepChatStore(settings)
         self.parser = PDFParser(settings)
         self.deep_chat_evidence_materializer = DeepChatEvidenceMaterializer()
@@ -72,6 +81,8 @@ class IndexBuilder:
         parse_failure_counts: dict[str, int] = defaultdict(int)
 
         total_papers = len(source_papers)
+        if self.progress is not None:
+            self.progress.index_parse_start(total=total_papers)
         for index, paper in enumerate(source_papers, start=1):
             self._check_cancel()
             try:
@@ -120,7 +131,16 @@ class IndexBuilder:
                 backend_name = bundle.paper.parser_backend or self.settings.pdf_parser_backend
                 parser_backend_counts[backend_name] += 1
 
-            if index % 25 == 0 or index == total_papers:
+            if self.progress is not None:
+                self.progress.index_parse_update(
+                    completed=index,
+                    total=total_papers,
+                    indexed=len(parsed_papers),
+                    failed=len(parse_failures),
+                    sections=len(sections),
+                    chunks=len(chunks),
+                )
+            elif index % 25 == 0 or index == total_papers:
                 elapsed = time.perf_counter() - parse_stage_start
                 rate = index / elapsed if elapsed > 0 else 0.0
                 remaining = max(total_papers - index, 0)
@@ -140,6 +160,8 @@ class IndexBuilder:
                 )
 
         self._check_cancel()
+        if self.progress is not None:
+            self.progress.prepare("building section, chunk, and evidence records")
         text_chunks = [chunk for chunk in chunks if chunk.chunk_type == "text_chunk"]
         table_chunks = [chunk for chunk in chunks if chunk.chunk_type == "table_chunk"]
         figure_chunks = [chunk for chunk in chunks if chunk.chunk_type == "figure_chunk"]
@@ -172,6 +194,8 @@ class IndexBuilder:
         )
 
         self._check_cancel()
+        if self.progress is not None:
+            self.progress.save_start()
         self.store.save_papers(updated_papers)
         self.store.save_sections(sections)
         self.store.save_objects(objects)
@@ -261,6 +285,8 @@ class IndexBuilder:
                 "built_at": now_iso(),
             }
         )
+        if self.progress is not None:
+            self.progress.save_done()
 
         built_at = now_iso()
         state = {
@@ -370,12 +396,23 @@ class IndexBuilder:
         checkpoint_count = min(40, total)
         next_checkpoint = 1
 
-        logger.info("[bold blue]Index[/] | encode_start dataset=%s total=%s backend=%s", display_name, total, encoder.backend_name)
+        if self.progress is not None:
+            self.progress.encode_start(name=display_name, total=total, backend=encoder.backend_name)
+        else:
+            logger.info(
+                "[bold blue]Index[/] | encode_start dataset=%s total=%s backend=%s",
+                display_name,
+                total,
+                encoder.backend_name,
+            )
 
         def progress_callback(completed: int, total_items: int) -> None:
             nonlocal next_checkpoint
             self._check_cancel()
             if total_items <= 0:
+                return
+            if self.progress is not None:
+                self.progress.encode_update(name=display_name, completed=completed, total=total_items)
                 return
             progress_ratio = completed / total_items
             target_checkpoint = math.floor(progress_ratio * checkpoint_count)
@@ -399,13 +436,16 @@ class IndexBuilder:
         vectors = encoder.encode(texts, progress_callback=progress_callback)
         elapsed = time.perf_counter() - start_time
         rate = total / elapsed if elapsed > 0 else 0.0
-        logger.info(
-            "[bold blue]Index[/] | encode_done dataset=%s total=%s elapsed=%s avg_rate_items_per_sec=%.2f",
-            display_name,
-            total,
-            self._format_duration(elapsed),
-            rate,
-        )
+        if self.progress is not None:
+            self.progress.encode_done(name=display_name, total=total)
+        else:
+            logger.info(
+                "[bold blue]Index[/] | encode_done dataset=%s total=%s elapsed=%s avg_rate_items_per_sec=%.2f",
+                display_name,
+                total,
+                self._format_duration(elapsed),
+                rate,
+            )
         return vectors
 
     def _check_cancel(self) -> None:

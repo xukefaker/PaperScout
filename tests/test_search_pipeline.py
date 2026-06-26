@@ -502,7 +502,7 @@ def test_index_command_uses_active_corpus_for_demo_papers(tmp_path: Path, monkey
             return {"indexed_papers": self.indexed_papers}
 
     class _FakeIndexBuilder:
-        def __init__(self, builder_settings: Settings, store: LocalStore, *, cancel_check=None) -> None:
+        def __init__(self, builder_settings: Settings, store: LocalStore, *, cancel_check=None, progress=None) -> None:
             self.settings = builder_settings
             seen["corpus"] = (
                 builder_settings.corpus.venue,
@@ -558,7 +558,7 @@ def test_index_command_cleans_staged_files_on_cancel(tmp_path: Path, monkeypatch
     )
 
     class _CancelingIndexBuilder:
-        def __init__(self, builder_settings: Settings, store: LocalStore, *, cancel_check=None) -> None:
+        def __init__(self, builder_settings: Settings, store: LocalStore, *, cancel_check=None, progress=None) -> None:
             self.settings = builder_settings
 
         def load_paper_ids(self, paper_id_file: Path) -> list[str]:

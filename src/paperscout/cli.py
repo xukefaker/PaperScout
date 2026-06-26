@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from .acl_anthology import ACLAnthologyIngestor
 from .cancel import CancelRequested, ConsoleCancelWatcher
 from .config import CorpusSpec, Settings
 from .devices import resolve_mineru_device, resolve_torch_device, torch_cuda_report
+from .index_progress import IndexProgress
 from .indexer import IndexBuilder
 from .models import PaperRecord
 from .runtime import resolve_project_root
@@ -184,6 +186,19 @@ def _run_until_exit(processes: list[subprocess.Popen[bytes]]) -> int:
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 process.kill()
+
+
+@contextmanager
+def _quiet_index_loggers():
+    logger_names = ["paperscout.indexer", "paperscout.mineru_pipeline"]
+    previous = {name: logging.getLogger(name).level for name in logger_names}
+    try:
+        for name in logger_names:
+            logging.getLogger(name).setLevel(logging.WARNING)
+        yield
+    finally:
+        for name, level in previous.items():
+            logging.getLogger(name).setLevel(level)
 
 
 def _staged_index_settings(settings: Settings, run_id: str, *, stage_parse: bool) -> Settings:
@@ -402,8 +417,8 @@ def index_library(
 
         staged_settings = _staged_index_settings(settings, run_id, stage_parse=run_parse)
         staged_store = LocalStore(staged_settings)
-        Console().print("[bold cyan]Index[/] Press [bold]q[/] to cancel and clean this run.")
-        with ConsoleCancelWatcher() as cancel:
+        Console(stderr=True).print("[bold cyan]Index[/] Press [bold]q[/] to cancel and clean this run.")
+        with ConsoleCancelWatcher() as cancel, IndexProgress() as progress, _quiet_index_loggers():
             if run_parse:
                 from .mineru_pipeline import run_mineru_pipeline
 
@@ -411,22 +426,25 @@ def index_library(
                     settings=staged_settings,
                     papers=source_papers,
                     cancel_check=cancel.check,
+                    progress=progress,
                 )
 
-            builder = IndexBuilder(staged_settings, staged_store, cancel_check=cancel.check)
+            builder = IndexBuilder(staged_settings, staged_store, cancel_check=cancel.check, progress=progress)
             paper_ids = builder.load_paper_ids(paper_id_file) if paper_id_file is not None else None
             summary = builder.build(max_papers=max_papers, paper_ids=paper_ids)
             cancel.check()
 
-        if summary.indexed_papers <= 0:
-            raise RuntimeError("Index build finished with 0 indexed papers. Check MinerU/PDF parse failures before publishing.")
+            if summary.indexed_papers <= 0:
+                raise RuntimeError("Index build finished with 0 indexed papers. Check MinerU/PDF parse failures before publishing.")
 
-        if run_parse:
-            _publish_mineru_artifacts(staged_settings, settings, source_papers)
-        _publish_current_release(staged_settings, settings)
-        _write_completed_index_state(settings, summary)
-        manifest = rebuild_search_current(_project_root(), corpora=[settings.corpus])
-        _write_search_current_scope([settings.corpus])
+            progress.publish_start()
+            if run_parse:
+                _publish_mineru_artifacts(staged_settings, settings, source_papers)
+            _publish_current_release(staged_settings, settings)
+            _write_completed_index_state(settings, summary)
+            manifest = rebuild_search_current(_project_root(), corpora=[settings.corpus])
+            _write_search_current_scope([settings.corpus])
+            progress.publish_done()
         typer.echo(json.dumps({"build": summary.model_dump(), "search_current": manifest}, ensure_ascii=False, indent=2))
     except CancelRequested:
         _cleanup_run_dir(settings, run_id)

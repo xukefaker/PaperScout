@@ -14,6 +14,7 @@ _NOISY_LOGGER_LEVELS = {
     "urllib3": logging.WARNING,
     "sentence_transformers": logging.WARNING,
     "transformers": logging.WARNING,
+    "huggingface_hub": logging.ERROR,
     "pypdfium2": logging.WARNING,
     "mineru": logging.WARNING,
 }
@@ -25,6 +26,7 @@ def configure_terminal_logging() -> None:
         return
 
     os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     level_name = os.getenv("PAPERSCOUT_LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)

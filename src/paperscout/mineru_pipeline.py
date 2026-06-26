@@ -5,7 +5,9 @@ import logging
 import os
 import shutil
 import time
+import warnings
 from collections.abc import Callable
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -29,6 +31,22 @@ class BatchItem:
     paper: PaperRecord
     pdf_path: Path
     pages: int
+
+
+class _TailCapture:
+    def __init__(self, max_chars: int = 4000) -> None:
+        self.max_chars = max_chars
+        self._value = ""
+
+    def write(self, value: str) -> int:
+        self._value = (self._value + value)[-self.max_chars :]
+        return len(value)
+
+    def flush(self) -> None:
+        pass
+
+    def getvalue(self) -> str:
+        return self._value
 
 
 @dataclass(slots=True)
@@ -122,6 +140,7 @@ def run_mineru_pipeline(
     papers: list[PaperRecord],
     controller: Any | None = None,
     cancel_check: Callable[[], None] | None = None,
+    progress: Any | None = None,
     config: MinerUPipelineConfig | None = None,
 ) -> dict[str, int]:
     config = config or MinerUPipelineConfig()
@@ -142,7 +161,10 @@ def run_mineru_pipeline(
         and paper.paper_id not in failed_ids
     ]
     if not pending_items:
-        logger.info("[bold magenta]MinerU[/] | skipped corpus=%s reason=no_pending_pdfs", settings.corpus.key)
+        if progress is not None:
+            progress.mineru_skip(skipped_failed=len(failed_ids))
+        else:
+            logger.info("[bold magenta]MinerU[/] | skipped corpus=%s reason=no_pending_pdfs", settings.corpus.key)
         return {"processed": 0, "failed": 0, "skipped_failed": len(failed_ids)}
 
     start_time = time.time()
@@ -154,28 +176,34 @@ def run_mineru_pipeline(
     processed = 0
     failed = 0
     total = len(pending_items)
+    if progress is not None:
+        progress.mineru_start(total=total, batches=len(batches))
 
-    logger.info(
-        "[bold magenta]MinerU[/] | start corpus=%s pending=%s batch_limit=%s/%s",
-        settings.corpus.key,
-        total,
-        config.max_pdfs_per_batch,
-        config.max_pages_per_batch,
-    )
+    if progress is None:
+        logger.info(
+            "[bold magenta]MinerU[/] | start corpus=%s pending=%s batch_limit=%s/%s",
+            settings.corpus.key,
+            total,
+            config.max_pdfs_per_batch,
+            config.max_pages_per_batch,
+        )
 
     for batch_index, batch in enumerate(batches, start=1):
         _check_pause(controller)
         _check_cancel(cancel_check)
         batch_ids = [item.paper.paper_id for item in batch]
         batch_pages = sum(item.pages for item in batch)
-        logger.info(
-            "[bold magenta]MinerU[/] | batch_start batch=%s/%s papers=%s pages=%s ids=%s",
-            batch_index,
-            len(batches),
-            len(batch),
-            batch_pages,
-            " ".join(batch_ids),
-        )
+        if progress is not None:
+            progress.mineru_batch(batch_index=batch_index, batches=len(batches), papers=len(batch), pages=batch_pages)
+        else:
+            logger.info(
+                "[bold magenta]MinerU[/] | batch_start batch=%s/%s papers=%s pages=%s ids=%s",
+                batch_index,
+                len(batches),
+                len(batch),
+                batch_pages,
+                " ".join(batch_ids),
+            )
         try:
             _run_batch(
                 batch,
@@ -185,10 +213,13 @@ def run_mineru_pipeline(
                 backend=settings.mineru_backend,
                 formula=settings.mineru_formula,
                 table=settings.mineru_table,
+                quiet_output=progress is not None,
             )
             _check_cancel(cancel_check)
             processed += len(batch)
             remove_failure_entries(settings.mineru_failure_manifest_path, set(batch_ids))
+            if progress is not None:
+                progress.mineru_update(completed=processed + failed, total=total, failed=failed)
             _emit_progress(
                 controller=controller,
                 phase="parse",
@@ -201,10 +232,13 @@ def run_mineru_pipeline(
         except CancelRequested:
             raise
         except Exception as exc:
-            logger.warning("[bold magenta]MinerU[/] | batch_failed batch=%s/%s error=%r", batch_index, len(batches), exc)
+            if progress is None:
+                logger.warning("[bold magenta]MinerU[/] | batch_failed batch=%s/%s error=%r", batch_index, len(batches), exc)
             for item in batch:
                 _check_pause(controller)
                 _check_cancel(cancel_check)
+                if progress is not None:
+                    progress.mineru_batch(batch_index=batch_index, batches=len(batches), papers=1, pages=item.pages)
                 try:
                     _run_batch(
                         [item],
@@ -214,10 +248,13 @@ def run_mineru_pipeline(
                         backend=settings.mineru_backend,
                         formula=settings.mineru_formula,
                         table=settings.mineru_table,
+                        quiet_output=progress is not None,
                     )
                     _check_cancel(cancel_check)
                     processed += 1
                     remove_failure_entries(settings.mineru_failure_manifest_path, {item.paper.paper_id})
+                    if progress is not None:
+                        progress.mineru_update(completed=processed + failed, total=total, failed=failed)
                 except CancelRequested:
                     raise
                 except Exception as single_exc:
@@ -233,6 +270,8 @@ def run_mineru_pipeline(
                         suggestion="Inspect the PDF and MinerU artifacts. Fix the PDF if needed, then rerun this corpus with rebuild.",
                     )
                     logger.error("[bold magenta]MinerU[/] | single_paper_failed paper=%s error=%r", item.paper.paper_id, single_exc)
+                    if progress is not None:
+                        progress.mineru_update(completed=processed + failed, total=total, failed=failed)
                 _emit_progress(
                     controller=controller,
                     phase="parse",
@@ -243,13 +282,14 @@ def run_mineru_pipeline(
                     started_at=start_time,
                 )
 
-    logger.info(
-        "[bold magenta]MinerU[/] | done corpus=%s success=%s failed=%s elapsed=%s",
-        settings.corpus.key,
-        processed,
-        failed,
-        _format_duration(time.time() - start_time),
-    )
+    if progress is None:
+        logger.info(
+            "[bold magenta]MinerU[/] | done corpus=%s success=%s failed=%s elapsed=%s",
+            settings.corpus.key,
+            processed,
+            failed,
+            _format_duration(time.time() - start_time),
+        )
     return {"processed": processed, "failed": failed, "skipped_failed": len(failed_ids)}
 
 
@@ -262,14 +302,60 @@ def _run_batch(
     backend: str,
     formula: bool,
     table: bool,
+    quiet_output: bool = False,
 ) -> None:
     pdf_file_names = [item.paper.paper_id for item in batch]
     pdf_bytes_list = [read_fn(item.pdf_path) for item in batch]
+    output = _TailCapture()
+    try:
+        if quiet_output:
+            with redirect_stdout(output), redirect_stderr(output), warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                _do_parse(
+                    output_dir=output_dir,
+                    pdf_file_names=pdf_file_names,
+                    pdf_bytes_list=pdf_bytes_list,
+                    lang=lang,
+                    backend=backend,
+                    parse_method=parse_method,
+                    formula=formula,
+                    table=table,
+                )
+            return
+        _do_parse(
+            output_dir=output_dir,
+            pdf_file_names=pdf_file_names,
+            pdf_bytes_list=pdf_bytes_list,
+            lang=lang,
+            backend=backend,
+            parse_method=parse_method,
+            formula=formula,
+            table=table,
+        )
+    except Exception as exc:
+        captured = output.getvalue().strip()
+        if captured:
+            tail = captured[-2000:]
+            raise RuntimeError(f"{exc!r}\nMinerU output tail:\n{tail}") from exc
+        raise
+
+
+def _do_parse(
+    *,
+    output_dir: Path,
+    pdf_file_names: list[str],
+    pdf_bytes_list: list[bytes],
+    lang: str,
+    backend: str,
+    parse_method: str,
+    formula: bool,
+    table: bool,
+) -> None:
     do_parse(
         output_dir=str(output_dir),
         pdf_file_names=pdf_file_names,
         pdf_bytes_list=pdf_bytes_list,
-        p_lang_list=[lang] * len(batch),
+        p_lang_list=[lang] * len(pdf_file_names),
         backend=backend,
         parse_method=parse_method,
         formula_enable=formula,
@@ -293,6 +379,7 @@ def _configure_mineru_env(*, settings: Settings, config: MinerUPipelineConfig) -
     os.environ["MINERU_PDF_RENDER_TIMEOUT"] = str(config.render_timeout)
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 
 def _build_batches(items: list[BatchItem], *, max_pdfs: int, max_pages: int) -> list[list[BatchItem]]:
