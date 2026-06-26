@@ -5,21 +5,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .devices import require_cuda_ready
+from .devices import resolve_torch_device
 
 
 def _resolve_device(device: str | None) -> str:
-    explicit = (device or "").strip()
-    if explicit:
-        require_cuda_ready(explicit, purpose="Dense retrieval")
-        return explicit
-    try:
-        import torch
-    except Exception:
-        return "cpu"
-    if torch.cuda.is_available():
-        return "cuda:0"
-    return "cpu"
+    return resolve_torch_device(device, purpose="Dense retrieval")
 
 
 class BaseEncoder:

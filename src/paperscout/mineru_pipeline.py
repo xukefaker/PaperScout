@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -14,8 +15,9 @@ import pypdfium2 as pdfium
 from mineru.cli.common import do_parse, read_fn
 from mineru.utils.enum_class import MakeMode
 
+from .cancel import CancelRequested
 from .config import Settings
-from .devices import require_cuda_ready
+from .devices import resolve_mineru_device
 from .models import PaperRecord, ParseFailureRecord
 from .utils import now_iso
 
@@ -119,6 +121,7 @@ def run_mineru_pipeline(
     settings: Settings,
     papers: list[PaperRecord],
     controller: Any | None = None,
+    cancel_check: Callable[[], None] | None = None,
     config: MinerUPipelineConfig | None = None,
 ) -> dict[str, int]:
     config = config or MinerUPipelineConfig()
@@ -162,6 +165,7 @@ def run_mineru_pipeline(
 
     for batch_index, batch in enumerate(batches, start=1):
         _check_pause(controller)
+        _check_cancel(cancel_check)
         batch_ids = [item.paper.paper_id for item in batch]
         batch_pages = sum(item.pages for item in batch)
         logger.info(
@@ -182,6 +186,7 @@ def run_mineru_pipeline(
                 formula=settings.mineru_formula,
                 table=settings.mineru_table,
             )
+            _check_cancel(cancel_check)
             processed += len(batch)
             remove_failure_entries(settings.mineru_failure_manifest_path, set(batch_ids))
             _emit_progress(
@@ -193,10 +198,13 @@ def run_mineru_pipeline(
                 unit="papers",
                 started_at=start_time,
             )
+        except CancelRequested:
+            raise
         except Exception as exc:
             logger.warning("[bold magenta]MinerU[/] | batch_failed batch=%s/%s error=%r", batch_index, len(batches), exc)
             for item in batch:
                 _check_pause(controller)
+                _check_cancel(cancel_check)
                 try:
                     _run_batch(
                         [item],
@@ -207,8 +215,11 @@ def run_mineru_pipeline(
                         formula=settings.mineru_formula,
                         table=settings.mineru_table,
                     )
+                    _check_cancel(cancel_check)
                     processed += 1
                     remove_failure_entries(settings.mineru_failure_manifest_path, {item.paper.paper_id})
+                except CancelRequested:
+                    raise
                 except Exception as single_exc:
                     failed += 1
                     _append_failure_entry(
@@ -275,8 +286,7 @@ def _run_batch(
 
 
 def _configure_mineru_env(*, settings: Settings, config: MinerUPipelineConfig) -> None:
-    device = settings.mineru_device or "cpu"
-    require_cuda_ready(device, purpose="MinerU PDF parsing")
+    device = resolve_mineru_device(settings.mineru_device, purpose="MinerU PDF parsing")
     os.environ["MINERU_DEVICE_MODE"] = device
     os.environ["MINERU_MIN_BATCH_INFERENCE_SIZE"] = str(config.min_batch_inference_size)
     os.environ["MINERU_PDF_RENDER_THREADS"] = str(config.render_threads)
@@ -380,6 +390,11 @@ def _emit_progress(
 def _check_pause(controller: Any | None) -> None:
     if controller is not None:
         controller.check_pause_requested()
+
+
+def _check_cancel(cancel_check: Callable[[], None] | None) -> None:
+    if cancel_check is not None:
+        cancel_check()
 
 
 def _format_duration(seconds: float | None) -> str:

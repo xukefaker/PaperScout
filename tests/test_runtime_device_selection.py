@@ -3,15 +3,19 @@ from __future__ import annotations
 import sys
 import types
 
-import pytest
-
 from paperscout.config import Settings
-from paperscout.devices import require_cuda_ready
+from paperscout.devices import resolve_mineru_device, resolve_torch_device
 from paperscout.encoders import EncoderConfig, SentenceTransformerEncoder
 from paperscout.reranker import CrossEncoderReranker, RerankerConfig
 
 
-def _install_fake_torch(monkeypatch, *, cuda_available: bool, cuda_version: str | None = "12.1") -> None:
+def _install_fake_torch(
+    monkeypatch,
+    *,
+    cuda_available: bool,
+    cuda_version: str | None = "12.1",
+    mps_available: bool = False,
+) -> None:
     monkeypatch.setitem(
         sys.modules,
         "torch",
@@ -19,6 +23,7 @@ def _install_fake_torch(monkeypatch, *, cuda_available: bool, cuda_version: str 
             __version__="test-torch",
             version=types.SimpleNamespace(cuda=cuda_version),
             cuda=types.SimpleNamespace(is_available=lambda: cuda_available),
+            backends=types.SimpleNamespace(mps=types.SimpleNamespace(is_available=lambda: mps_available)),
         ),
     )
 
@@ -96,8 +101,15 @@ def test_settings_device_env_sets_all_runtime_devices(tmp_path, monkeypatch) -> 
     assert settings.reranker_device == "cuda"
 
 
-def test_cuda_preflight_rejects_cpu_only_torch(monkeypatch) -> None:
+def test_cuda_request_falls_back_to_cpu_when_torch_has_no_cuda(monkeypatch) -> None:
     _install_fake_torch(monkeypatch, cuda_available=False, cuda_version=None)
 
-    with pytest.raises(RuntimeError, match="cannot use CUDA"):
-        require_cuda_ready("cuda", purpose="MinerU PDF parsing")
+    assert resolve_torch_device("cuda", purpose="Dense retrieval") == "cpu"
+    assert resolve_mineru_device("cuda", purpose="MinerU PDF parsing") == "cpu"
+
+
+def test_auto_device_uses_mps_for_torch_but_cpu_for_mineru(monkeypatch) -> None:
+    _install_fake_torch(monkeypatch, cuda_available=False, cuda_version=None, mps_available=True)
+
+    assert resolve_torch_device("auto", purpose="Dense retrieval") == "mps"
+    assert resolve_mineru_device("auto", purpose="MinerU PDF parsing") == "cpu"

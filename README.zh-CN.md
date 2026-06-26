@@ -2,70 +2,78 @@
 
 [English](README.md) | 简体中文
 
-用你自己的 PDF 做本地论文检索。加入论文，构建 evidence-aware 索引，打开网页，然后直接提问。
+用你自己的 PDF 做本地论文检索。把 PDF 放进文件夹，构建 evidence-aware 索引，打开网页，然后直接提问。
 
 ## 快速开始
 
-环境要求：uv、Node.js 20+、OpenAI 兼容 API key。PaperScout 的 Python 环境只用 uv 管理。
+需要：uv、Node.js 20+、一个 OpenAI 兼容 API key。
 
-如果还没有 uv，先安装：
+还没有 uv 的话先安装：
 
 ```powershell
-# Windows PowerShell
 winget install --id=astral-sh.uv -e
 ```
 
 ```bash
-# macOS/Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-然后安装并运行 PaperScout：
+安装 PaperScout：
 
 ```bash
 git clone https://github.com/xukefaker/PaperScout.git
 cd PaperScout
-
-uv python install 3.12
-uv sync
-
-uv run paperscout init
-
-# 编辑 .env:
-# OPENAI_API_KEY=sk-...
-# OPENAI_BASE_URL=https://api.openai.com/v1
-# OPENAI_MODEL=gpt-4o-mini
-# PAPERSCOUT_DEVICE=cpu
-
-uv run paperscout doctor
-
-mkdir -p pdfs
-# 把你的 PDF 放进 ./pdfs
-
-uv run paperscout add-pdfs ./pdfs
-uv run paperscout index
-uv run paperscout web
 ```
 
-然后打开 `http://127.0.0.1:4000`。
+Windows PowerShell：
 
-除非 `uv run paperscout doctor` 显示 `CUDA available=True`，否则保持 `PAPERSCOUT_DEVICE=cpu`。
-只有 NVIDIA 显卡还不够：项目 `.venv` 里的 PyTorch 也必须是支持 CUDA 的版本。
+```powershell
+.\scripts\install.ps1
+```
+
+macOS/Linux：
+
+```bash
+./scripts/install.sh
+```
+
+安装脚本会创建 `.venv/`，用 uv 自动选择 PyTorch 后端，创建 `.env`，并运行 `paperscout doctor`。
+
+编辑 `.env`：
+
+```env
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+PAPERSCOUT_DEVICE=auto
+```
+
+## 使用你的 PDF
+
+```bash
+mkdir -p pdfs
+# 把 PDF 放进 ./pdfs
+
+uv run --no-sync paperscout add-pdfs ./pdfs
+uv run --no-sync paperscout index
+uv run --no-sync paperscout web
+```
+
+打开 `http://127.0.0.1:4000`。
+
+运行 `paperscout index` 时，可以按 `q` 取消。PaperScout 会删除本次运行的临时文件，并保留上一次可用索引。
 
 ## 体验示例论文
 
-暂时没有自己的 PDF？可以下载 100 篇 ACL 2025 long track 论文：
-
 ```bash
-uv run paperscout demo-acl --max-papers 100
-uv run paperscout index
-uv run paperscout web
+uv run --no-sync paperscout demo-acl --max-papers 20
+uv run --no-sync paperscout index
+uv run --no-sync paperscout web
 ```
 
-## 说明
+## 运行说明
 
-- uv 会在项目根目录下创建 `.venv/`。
-- PDF 和索引默认保存在 `data/`。
-- 问题会发送到你配置的 OpenAI 兼容 API。
-- 小规模论文库可以用 CPU；只有 `paperscout doctor` 确认 PyTorch 能看到 CUDA 后再用 CUDA。
-- 第一次运行 `uv run paperscout web` 时，如果需要，会自动在 `apps/web` 安装前端依赖。
+- `PAPERSCOUT_DEVICE=auto` 会优先使用 PyTorch 可用的 CUDA 或 Apple MPS。
+- 如果没有可用加速后端，PaperScout 会提示并继续用 CPU 跑，只是会慢。
+- PDF、解析结果和索引默认都在 `data/`。
+- 第一次运行 `paperscout web` 时，如果需要，会自动在 `apps/web` 安装前端依赖。

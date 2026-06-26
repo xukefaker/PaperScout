@@ -265,7 +265,9 @@ PROJECT_ROOT = resolve_project_root()
 async def lifespan(app: FastAPI):
     service_manager = AppServiceManager(PROJECT_ROOT)
     services = service_manager.get_services()
-    services.engine.load()
+    load_engine = getattr(services.engine, "load", None)
+    if callable(load_engine):
+        load_engine()
     app.state.service_manager = service_manager
     try:
         yield

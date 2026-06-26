@@ -5,6 +5,7 @@ import logging
 import hashlib
 import os
 import re
+import copy
 import shutil
 import subprocess
 import sys
@@ -18,8 +19,9 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .acl_anthology import ACLAnthologyIngestor
+from .cancel import CancelRequested, ConsoleCancelWatcher
 from .config import CorpusSpec, Settings
-from .devices import require_cuda_ready, torch_cuda_report
+from .devices import resolve_mineru_device, resolve_torch_device, torch_cuda_report
 from .indexer import IndexBuilder
 from .models import PaperRecord
 from .runtime import resolve_project_root
@@ -184,6 +186,85 @@ def _run_until_exit(processes: list[subprocess.Popen[bytes]]) -> int:
                 process.kill()
 
 
+def _staged_index_settings(settings: Settings, run_id: str, *, stage_parse: bool) -> Settings:
+    run_dir = settings.data_dir / ".runs" / run_id
+    staged = copy.copy(settings)
+    staged.current_release_path = run_dir / "release" / "current"
+    staged.normalized_dir = staged.current_release_path / "normalized"
+    staged.deep_chat_normalized_dir = staged.normalized_dir / "deep_chat"
+    staged.index_dir = staged.current_release_path / "indexes" / "layout"
+    staged.deep_chat_index_dir = staged.current_release_path / "indexes" / "deep_chat"
+    if stage_parse:
+        staged.mineru_output_dir = run_dir / "parsed" / "mineru"
+        staged.mineru_failure_manifest_path = run_dir / "parsed" / "mineru_failures.jsonl"
+    return staged
+
+
+def _cleanup_run_dir(settings: Settings, run_id: str) -> None:
+    run_dir = (settings.data_dir / ".runs" / run_id).resolve()
+    runs_root = (settings.data_dir / ".runs").resolve()
+    if run_dir == runs_root or runs_root not in run_dir.parents:
+        raise RuntimeError(f"Refusing to clean unsafe run directory: {run_dir}")
+    shutil.rmtree(run_dir, ignore_errors=True)
+
+
+def _publish_current_release(staged_settings: Settings, final_settings: Settings) -> None:
+    source = staged_settings.current_release_path
+    if not source.exists():
+        raise RuntimeError(f"Staged index release is missing: {source}")
+    destination = final_settings.current_release_path
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    backup = destination.parent / f".previous-current-{time.time_ns()}"
+    try:
+        if destination.exists():
+            destination.rename(backup)
+        source.rename(destination)
+    except Exception:
+        if destination.exists():
+            shutil.rmtree(destination, ignore_errors=True)
+        if backup.exists():
+            backup.rename(destination)
+        raise
+    if backup.exists():
+        shutil.rmtree(backup, ignore_errors=True)
+
+
+def _publish_mineru_artifacts(staged_settings: Settings, final_settings: Settings, papers: list[PaperRecord]) -> None:
+    from .mineru_pipeline import load_failure_entries, save_failure_entries
+
+    paper_ids = {paper.paper_id for paper in papers}
+    final_settings.mineru_output_dir.mkdir(parents=True, exist_ok=True)
+    for paper_id in sorted(paper_ids):
+        source = staged_settings.mineru_output_dir / paper_id
+        if not source.exists():
+            continue
+        destination = final_settings.mineru_output_dir / paper_id
+        backup = destination.with_name(f".previous-{destination.name}-{time.time_ns()}")
+        try:
+            if destination.exists():
+                destination.rename(backup)
+            source.rename(destination)
+        except Exception:
+            if destination.exists():
+                shutil.rmtree(destination, ignore_errors=True)
+            if backup.exists():
+                backup.rename(destination)
+            raise
+        if backup.exists():
+            shutil.rmtree(backup, ignore_errors=True)
+
+    final_entries = [
+        entry
+        for entry in load_failure_entries(final_settings.mineru_failure_manifest_path)
+        if entry.get("paper_id") not in paper_ids
+    ]
+    final_entries.extend(load_failure_entries(staged_settings.mineru_failure_manifest_path))
+    if final_entries:
+        save_failure_entries(final_settings.mineru_failure_manifest_path, final_entries)
+    else:
+        final_settings.mineru_failure_manifest_path.unlink(missing_ok=True)
+
+
 @app.command("init")
 def init_project(force_env: bool = typer.Option(False, "--force-env", help="Overwrite an existing .env file.")) -> None:
     root = _project_root()
@@ -204,8 +285,8 @@ def init_project(force_env: bool = typer.Option(False, "--force-env", help="Over
             "OPENAI_MODEL=gpt-4o-mini\n\n"
             "# Local storage for PDFs, parsed text, and indexes.\n"
             "PAPERSCOUT_DATA_DIR=./data\n\n"
-            "# Use cpu for widest compatibility. Change to cuda if NVIDIA CUDA works on your machine.\n"
-            "PAPERSCOUT_DEVICE=cpu\n",
+            "# auto prefers CUDA or Apple MPS when PyTorch can use it, otherwise CPU.\n"
+            "PAPERSCOUT_DEVICE=auto\n",
             encoding="utf-8",
         )
         typer.echo(f"Wrote {env_path}")
@@ -219,16 +300,24 @@ def doctor() -> None:
     root = _project_root()
     settings = Settings.from_env(root_dir=root)
     report = torch_cuda_report()
-    device = settings.mineru_device or "cpu"
+    requested_device = settings.mineru_device or "auto"
+    mineru_device = resolve_mineru_device(settings.mineru_device, purpose="MinerU PDF parsing")
+    dense_device = resolve_torch_device(settings.dense_device, purpose="Dense retrieval")
+    reranker_device = resolve_torch_device(settings.reranker_device, purpose="Reranking")
+    accelerated = bool(report["cuda_available"] or report.get("mps_available"))
     rows = [
         ("Project root", str(root), "ok"),
         (".env", "found" if root.joinpath(".env").exists() else "missing", "ok" if root.joinpath(".env").exists() else "warning"),
         ("OPENAI_API_KEY", "set" if settings.openai_api_key else "missing", "ok" if settings.openai_api_key else "warning"),
         ("Node.js", shutil.which("node") or "not found", "ok" if shutil.which("node") else "warning"),
-        ("Device", device, "ok"),
+        ("Requested device", requested_device, "ok"),
+        ("MinerU device", mineru_device, "ok" if mineru_device != "cpu" or not accelerated else "warning"),
+        ("Dense device", dense_device, "ok" if dense_device != "cpu" or not accelerated else "warning"),
+        ("Reranker device", reranker_device, "ok" if reranker_device != "cpu" or not accelerated else "warning"),
         ("Torch", str(report["torch_version"]), "ok" if report["torch_imported"] else "error"),
         ("Torch CUDA", str(report["torch_cuda_version"] or "none"), "ok" if report["torch_cuda_version"] else "warning"),
         ("CUDA available", str(report["cuda_available"]), "ok" if report["cuda_available"] else "warning"),
+        ("MPS available", str(report.get("mps_available", False)), "ok" if report.get("mps_available") else "warning"),
         ("GPU", str(report["gpu_name"] or "not visible to PyTorch"), "ok" if report["gpu_name"] else "warning"),
     ]
 
@@ -241,11 +330,6 @@ def doctor() -> None:
         table.add_row(name, value, f"[{color}]{status}[/]")
     console = Console()
     console.print(Panel(table, title="PaperScout Doctor", border_style="cyan"))
-
-    try:
-        require_cuda_ready(device, purpose="PaperScout")
-    except RuntimeError as exc:
-        _exit_with_error(str(exc))
 
 
 @app.command("add-pdfs")
@@ -300,12 +384,13 @@ def index_library(
     ),
     run_parse: bool = typer.Option(True, "--parse/--skip-parse", help="Run MinerU before building indexes."),
 ) -> None:
+    settings = (
+        Settings.from_env(root_dir=_project_root(), corpus=_personal_corpus(year))
+        if year is not None
+        else Settings.from_env(root_dir=_project_root())
+    )
+    run_id = f"index-{settings.corpus.venue}-{settings.corpus.year}-{settings.corpus.track}-{time.time_ns()}"
     try:
-        settings = (
-            Settings.from_env(root_dir=_project_root(), corpus=_personal_corpus(year))
-            if year is not None
-            else Settings.from_env(root_dir=_project_root())
-        )
         store = LocalStore(settings)
         source_papers = store.load_source_papers()
         if not source_papers:
@@ -315,23 +400,45 @@ def index_library(
                 "or `paperscout demo-acl` first."
             )
 
-        if run_parse:
-            from .mineru_pipeline import run_mineru_pipeline
+        staged_settings = _staged_index_settings(settings, run_id, stage_parse=run_parse)
+        staged_store = LocalStore(staged_settings)
+        Console().print("[bold cyan]Index[/] Press [bold]q[/] to cancel and clean this run.")
+        with ConsoleCancelWatcher() as cancel:
+            if run_parse:
+                from .mineru_pipeline import run_mineru_pipeline
 
-            run_mineru_pipeline(settings=settings, papers=source_papers)
+                run_mineru_pipeline(
+                    settings=staged_settings,
+                    papers=source_papers,
+                    cancel_check=cancel.check,
+                )
 
-        builder = IndexBuilder(settings, store)
-        paper_ids = builder.load_paper_ids(paper_id_file) if paper_id_file is not None else None
-        summary = builder.build(max_papers=max_papers, paper_ids=paper_ids)
+            builder = IndexBuilder(staged_settings, staged_store, cancel_check=cancel.check)
+            paper_ids = builder.load_paper_ids(paper_id_file) if paper_id_file is not None else None
+            summary = builder.build(max_papers=max_papers, paper_ids=paper_ids)
+            cancel.check()
+
         if summary.indexed_papers <= 0:
             raise RuntimeError("Index build finished with 0 indexed papers. Check MinerU/PDF parse failures before publishing.")
 
+        if run_parse:
+            _publish_mineru_artifacts(staged_settings, settings, source_papers)
+        _publish_current_release(staged_settings, settings)
         _write_completed_index_state(settings, summary)
         manifest = rebuild_search_current(_project_root(), corpora=[settings.corpus])
         _write_search_current_scope([settings.corpus])
         typer.echo(json.dumps({"build": summary.model_dump(), "search_current": manifest}, ensure_ascii=False, indent=2))
+    except CancelRequested:
+        _cleanup_run_dir(settings, run_id)
+        _exit_with_error("Index canceled. Staged files from this run were removed.")
     except RuntimeError as exc:
+        _cleanup_run_dir(settings, run_id)
         _exit_with_error(str(exc))
+    except KeyboardInterrupt:
+        _cleanup_run_dir(settings, run_id)
+        _exit_with_error("Index interrupted. Staged files from this run were removed.")
+    else:
+        _cleanup_run_dir(settings, run_id)
 
 
 @app.command("web")

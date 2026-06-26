@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 import paperscout.cli as cli_module
 from paperscout.acl_anthology import ACLAnthologyIngestor, _ListingEntry
 from paperscout.api import app
+from paperscout.cancel import CancelRequested
 from paperscout.cli import app as cli_app
 from paperscout.config import CorpusSpec, Settings
 from paperscout.indexer import IndexBuilder
@@ -501,7 +502,8 @@ def test_index_command_uses_active_corpus_for_demo_papers(tmp_path: Path, monkey
             return {"indexed_papers": self.indexed_papers}
 
     class _FakeIndexBuilder:
-        def __init__(self, builder_settings: Settings, store: LocalStore) -> None:
+        def __init__(self, builder_settings: Settings, store: LocalStore, *, cancel_check=None) -> None:
+            self.settings = builder_settings
             seen["corpus"] = (
                 builder_settings.corpus.venue,
                 builder_settings.corpus.year,
@@ -514,6 +516,8 @@ def test_index_command_uses_active_corpus_for_demo_papers(tmp_path: Path, monkey
         def build(self, max_papers: int | None = None, paper_ids: list[str] | None = None) -> _Summary:
             assert max_papers == 1
             assert paper_ids is None
+            self.settings.current_release_path.mkdir(parents=True, exist_ok=True)
+            (self.settings.current_release_path / "index-state.json").write_text("{}", encoding="utf-8")
             return _Summary()
 
     monkeypatch.setattr(cli_module, "IndexBuilder", _FakeIndexBuilder)
@@ -527,6 +531,52 @@ def test_index_command_uses_active_corpus_for_demo_papers(tmp_path: Path, monkey
 
     assert result.exit_code == 0, result.stdout
     assert seen["corpus"] == ("acl", 2025, "long")
+    assert not list((settings.data_dir / ".runs").glob("index-*"))
+
+
+def test_index_command_cleans_staged_files_on_cancel(tmp_path: Path, monkeypatch) -> None:
+    from paperscout.models import PaperRecord
+
+    monkeypatch.setattr(cli_module, "PROJECT_ROOT", str(tmp_path))
+    settings = Settings.from_env(tmp_path, corpus=CorpusSpec.from_values("personal", 2026, "library"))
+    settings.ensure_dirs()
+    pdf_path = tmp_path / "demo.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n")
+    LocalStore(settings).save_raw_papers(
+        [
+            PaperRecord(
+                paper_id="personal-demo",
+                title="Demo Paper",
+                venue="personal",
+                year=2026,
+                track="library",
+                url=pdf_path.as_uri(),
+                pdf_url=pdf_path.as_uri(),
+                local_pdf_path=str(pdf_path),
+            )
+        ]
+    )
+
+    class _CancelingIndexBuilder:
+        def __init__(self, builder_settings: Settings, store: LocalStore, *, cancel_check=None) -> None:
+            self.settings = builder_settings
+
+        def load_paper_ids(self, paper_id_file: Path) -> list[str]:
+            return []
+
+        def build(self, max_papers: int | None = None, paper_ids: list[str] | None = None):
+            self.settings.current_release_path.mkdir(parents=True, exist_ok=True)
+            (self.settings.current_release_path / "partial.txt").write_text("partial", encoding="utf-8")
+            raise CancelRequested("Canceled by user.")
+
+    monkeypatch.setattr(cli_module, "IndexBuilder", _CancelingIndexBuilder)
+
+    result = CliRunner().invoke(cli_app, ["index", "--year", "2026", "--skip-parse", "--max-papers", "1"])
+
+    assert result.exit_code == 1, result.stdout
+    assert "Index canceled" in f"{result.stdout}\n{result.stderr}"
+    assert not settings.current_release_path.exists()
+    assert not list((settings.data_dir / ".runs").glob("index-*"))
 
 
 def test_index_builder_honors_explicit_paper_id_order(tmp_path: Path, monkeypatch) -> None:

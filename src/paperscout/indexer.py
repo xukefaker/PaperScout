@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+from collections.abc import Callable
 from collections import defaultdict
 from pathlib import Path
 
@@ -31,9 +32,10 @@ ENCODE_LABELS = {
 
 
 class IndexBuilder:
-    def __init__(self, settings: Settings, store: LocalStore) -> None:
+    def __init__(self, settings: Settings, store: LocalStore, *, cancel_check: Callable[[], None] | None = None) -> None:
         self.settings = settings
         self.store = store
+        self.cancel_check = cancel_check
         self.deep_chat_store = DeepChatStore(settings)
         self.parser = PDFParser(settings)
         self.deep_chat_evidence_materializer = DeepChatEvidenceMaterializer()
@@ -71,6 +73,7 @@ class IndexBuilder:
 
         total_papers = len(source_papers)
         for index, paper in enumerate(source_papers, start=1):
+            self._check_cancel()
             try:
                 bundle = self.parser.parse(paper)
             except Exception as exc:
@@ -136,6 +139,7 @@ class IndexBuilder:
                     self._format_duration(eta_seconds),
                 )
 
+        self._check_cancel()
         text_chunks = [chunk for chunk in chunks if chunk.chunk_type == "text_chunk"]
         table_chunks = [chunk for chunk in chunks if chunk.chunk_type == "table_chunk"]
         figure_chunks = [chunk for chunk in chunks if chunk.chunk_type == "figure_chunk"]
@@ -154,6 +158,7 @@ class IndexBuilder:
         figure_chunk_texts = [self._chunk_search_text(chunk) for chunk in figure_chunks]
         deep_chat_evidence_texts = [build_evidence_search_text(unit) for unit in deep_chat_evidence_units]
 
+        self._check_cancel()
         paper_vectors = self._encode(self.paper_encoder, paper_texts, "paper")
         section_vectors = self._encode(self.chunk_encoder, section_texts, "section")
         chunk_vectors = self._encode(self.chunk_encoder, all_chunk_texts, "chunk")
@@ -166,6 +171,7 @@ class IndexBuilder:
             "deep_chat_evidence",
         )
 
+        self._check_cancel()
         self.store.save_papers(updated_papers)
         self.store.save_sections(sections)
         self.store.save_objects(objects)
@@ -368,6 +374,7 @@ class IndexBuilder:
 
         def progress_callback(completed: int, total_items: int) -> None:
             nonlocal next_checkpoint
+            self._check_cancel()
             if total_items <= 0:
                 return
             progress_ratio = completed / total_items
@@ -400,6 +407,10 @@ class IndexBuilder:
             rate,
         )
         return vectors
+
+    def _check_cancel(self) -> None:
+        if self.cancel_check is not None:
+            self.cancel_check()
 
     def _format_duration(self, seconds: float | None) -> str:
         if seconds is None or not math.isfinite(seconds):
