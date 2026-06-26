@@ -28,8 +28,10 @@ cd PaperScout
 Windows PowerShell：
 
 ```powershell
-.\scripts\install.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
+
+这个 bypass 只对这一次安装命令生效，不会永久修改系统策略。
 
 macOS/Linux：
 
