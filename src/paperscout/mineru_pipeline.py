@@ -34,16 +34,26 @@ class BatchItem:
 
 
 class _TailCapture:
+    encoding = "utf-8"
+    errors = "replace"
+
     def __init__(self, max_chars: int = 4000) -> None:
         self.max_chars = max_chars
         self._value = ""
 
-    def write(self, value: str) -> int:
+    def write(self, value: object) -> int:
+        value = str(value)
         self._value = (self._value + value)[-self.max_chars :]
         return len(value)
 
     def flush(self) -> None:
         pass
+
+    def isatty(self) -> bool:
+        return False
+
+    def writable(self) -> bool:
+        return True
 
     def getvalue(self) -> str:
         return self._value
