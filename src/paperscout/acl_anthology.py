@@ -56,10 +56,13 @@ class ACLAnthologyIngestor:
             year,
             ",".join(tracks),
         )
-        with httpx.Client(timeout=self.settings.request_timeout, follow_redirects=True) as client:
-            response = client.get(event_url)
-            response.raise_for_status()
-            listings = self._parse_event_page(response.text, venue=venue.lower(), year=year)
+        try:
+            with httpx.Client(timeout=self.settings.request_timeout, follow_redirects=True) as client:
+                response = client.get(event_url)
+                response.raise_for_status()
+                listings = self._parse_event_page(response.text, venue=venue.lower(), year=year)
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f"Could not reach ACL Anthology event page. url={event_url} error={exc}") from exc
         filtered = self._filter_listings(listings, tracks)
         if max_papers is not None:
             filtered = filtered[:max_papers]
@@ -215,10 +218,19 @@ class ACLAnthologyIngestor:
         completed = 0
 
         def worker(listing: _ListingEntry) -> tuple[str, str]:
-            with httpx.Client(timeout=self.settings.request_timeout, follow_redirects=True) as client:
-                response = client.get(listing.url)
-                response.raise_for_status()
-            return listing.paper_id, self._extract_paper_page_title(response.text, listing.url)
+            try:
+                with httpx.Client(timeout=self.settings.request_timeout, follow_redirects=True) as client:
+                    response = client.get(listing.url)
+                    response.raise_for_status()
+                return listing.paper_id, self._extract_paper_page_title(response.text, listing.url)
+            except httpx.HTTPError as exc:
+                logger.warning(
+                    "[bold cyan]Manifest[/] | title_check_failed paper=%s url=%s error=%s",
+                    listing.paper_id,
+                    listing.url,
+                    exc,
+                )
+                return listing.paper_id, listing.listing_title
 
         listing_by_id = {listing.paper_id: listing for listing in listings}
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -273,10 +285,18 @@ class ACLAnthologyIngestor:
             if destination.exists():
                 return listing.paper_id, destination, False
             destination.parent.mkdir(parents=True, exist_ok=True)
-            with httpx.Client(timeout=self.settings.request_timeout, follow_redirects=True) as client:
-                response = client.get(listing.pdf_url)
-                response.raise_for_status()
-                destination.write_bytes(response.content)
+            try:
+                with httpx.Client(timeout=self.settings.request_timeout, follow_redirects=True) as client:
+                    response = client.get(listing.pdf_url)
+                    response.raise_for_status()
+                    destination.write_bytes(response.content)
+            except httpx.HTTPError as exc:
+                if destination.exists():
+                    destination.unlink()
+                raise RuntimeError(
+                    "Could not download an ACL Anthology PDF. "
+                    f"paper={listing.paper_id} url={listing.pdf_url} error={exc}"
+                ) from exc
             return listing.paper_id, destination, True
 
         logger.info(

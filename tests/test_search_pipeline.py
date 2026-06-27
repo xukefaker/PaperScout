@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+import httpx
 import numpy as np
 import pytest
 from typer.testing import CliRunner
@@ -1384,6 +1385,7 @@ def test_acl_ingestor_uses_hierarchical_pdf_destination(tmp_path: Path) -> None:
     listing = _ListingEntry(
         paper_id="2025.acl-long.1383",
         title="Test Paper",
+        listing_title="Test Paper",
         authors=["A"],
         abstract="B",
         volume_id="2025.acl-long",
@@ -1399,6 +1401,62 @@ def test_acl_ingestor_uses_hierarchical_pdf_destination(tmp_path: Path) -> None:
     assert destination == settings.pdf_dir / "acl" / "2025" / "long" / "2025.acl-long.1383.pdf"
 
 
+def test_acl_download_timeout_becomes_readable_error(tmp_path: Path, monkeypatch) -> None:
+    settings = Settings.from_env(tmp_path)
+    store = LocalStore(settings)
+    ingestor = ACLAnthologyIngestor(settings, store)
+    listing = _ListingEntry(
+        paper_id="2025.acl-long.20",
+        title="Test Paper",
+        listing_title="Test Paper",
+        authors=["A"],
+        abstract="B",
+        volume_id="2025.acl-long",
+        venue="acl",
+        year=2025,
+        track="long",
+        url="https://aclanthology.org/2025.acl-long.20/",
+        pdf_url="https://aclanthology.org/2025.acl-long.20.pdf",
+    )
+
+    class _TimeoutClient:
+        def __init__(self, *_, **__) -> None:
+            pass
+
+        def __enter__(self) -> "_TimeoutClient":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def get(self, url: str):
+            raise httpx.ConnectTimeout("timed out")
+
+    monkeypatch.setattr("paperscout.acl_anthology.httpx.Client", _TimeoutClient)
+
+    with pytest.raises(RuntimeError, match="paper=2025.acl-long.20"):
+        ingestor._download_pdfs([listing])
+
+    assert not ingestor._pdf_destination(listing).exists()
+
+
+def test_demo_acl_reports_download_failure_without_traceback(monkeypatch) -> None:
+    class _FailingIngestor:
+        def __init__(self, *_, **__) -> None:
+            pass
+
+        def ingest_event(self, *_, **__):
+            raise RuntimeError("Could not download an ACL Anthology PDF.")
+
+    monkeypatch.setattr(cli_module, "ACLAnthologyIngestor", _FailingIngestor)
+
+    result = CliRunner().invoke(cli_app, ["demo-acl", "--max-papers", "1"])
+
+    assert result.exit_code == 1
+    assert "Could not download an ACL Anthology PDF." in result.output
+    assert "Traceback" not in result.output
+
+
 def test_acl_ingestor_treats_main_and_demo_aliases_as_in_scope(tmp_path: Path) -> None:
     settings = Settings.from_env(tmp_path)
     store = LocalStore(settings)
@@ -1407,6 +1465,7 @@ def test_acl_ingestor_treats_main_and_demo_aliases_as_in_scope(tmp_path: Path) -
         _ListingEntry(
             paper_id="2022.emnlp-main.1",
             title="Main Volume Paper",
+            listing_title="Main Volume Paper",
             authors=["A"],
             abstract="B",
             volume_id="2022.emnlp-main",
@@ -1419,6 +1478,7 @@ def test_acl_ingestor_treats_main_and_demo_aliases_as_in_scope(tmp_path: Path) -
         _ListingEntry(
             paper_id="2025.emnlp-demos.1",
             title="Demo Volume Paper",
+            listing_title="Demo Volume Paper",
             authors=["A"],
             abstract="B",
             volume_id="2025.emnlp-demos",
@@ -1443,6 +1503,7 @@ def test_acl_ingestor_does_not_expand_long_or_short_to_full_main_family(tmp_path
         _ListingEntry(
             paper_id="2025.acl-long.1",
             title="Long Paper",
+            listing_title="Long Paper",
             authors=["A"],
             abstract="B",
             volume_id="2025.acl-long",
@@ -1455,6 +1516,7 @@ def test_acl_ingestor_does_not_expand_long_or_short_to_full_main_family(tmp_path
         _ListingEntry(
             paper_id="2025.acl-short.1",
             title="Short Paper",
+            listing_title="Short Paper",
             authors=["A"],
             abstract="B",
             volume_id="2025.acl-short",
@@ -1467,6 +1529,7 @@ def test_acl_ingestor_does_not_expand_long_or_short_to_full_main_family(tmp_path
         _ListingEntry(
             paper_id="2025.emnlp-main.1",
             title="Main Paper",
+            listing_title="Main Paper",
             authors=["A"],
             abstract="B",
             volume_id="2025.emnlp-main",

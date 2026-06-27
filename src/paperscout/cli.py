@@ -519,13 +519,16 @@ def demo_acl(
 ) -> None:
     corpus_track = _corpus_track([track])
     settings, store = _components_for_corpus(venue="acl", year=year, track=corpus_track)
-    summary = ACLAnthologyIngestor(settings, store).ingest_event(
-        venue="acl",
-        year=year,
-        tracks=[track],
-        max_papers=max_papers,
-        download_pdfs=True,
-    )
+    try:
+        summary = ACLAnthologyIngestor(settings, store).ingest_event(
+            venue="acl",
+            year=year,
+            tracks=[track],
+            max_papers=max_papers,
+            download_pdfs=True,
+        )
+    except RuntimeError as exc:
+        _exit_with_error(str(exc))
     _write_search_current_scope([settings.corpus])
     typer.echo(summary.model_dump_json(indent=2))
     typer.echo(f"Downloaded PDFs are under {settings.pdf_dir / 'acl' / str(year) / corpus_track}")

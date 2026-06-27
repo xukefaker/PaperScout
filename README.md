@@ -113,5 +113,6 @@ PAPERSCOUT_DEVICE=auto
 ```
 
 - `CUDA available=False`: your Python environment cannot use CUDA. CPU still works, but indexing is slower.
+- `demo-acl` PDF download timeout: ACL Anthology is unreachable from your network. Retry later, use a VPN/proxy, or skip the demo and run `./paperscout add-pdfs ./pdfs` with your own PDFs.
 - PowerShell blocks scripts: use the installer command shown in the Windows section; its bypass applies only to that command.
 - First `web` run is slow: frontend dependencies are installed under `apps/web/node_modules/`.
